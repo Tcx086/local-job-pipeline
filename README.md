@@ -31,8 +31,8 @@ Use this tool only for public job search, local scoring, local reporting, and ma
 Windows PowerShell:
 
 ```powershell
-git clone <repo-url>
-cd job_pipeline
+git clone https://github.com/Tcx086/local-job-pipeline.git
+cd local-job-pipeline
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -42,8 +42,8 @@ python -m pip install -r requirements.txt
 macOS/Linux:
 
 ```bash
-git clone <repo-url>
-cd job_pipeline
+git clone https://github.com/Tcx086/local-job-pipeline.git
+cd local-job-pipeline
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -53,8 +53,8 @@ python -m pip install -r requirements.txt
 ## Quickstart
 
 ```powershell
-git clone <repo-url>
-cd job_pipeline
+git clone https://github.com/Tcx086/local-job-pipeline.git
+cd local-job-pipeline
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
