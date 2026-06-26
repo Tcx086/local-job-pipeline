@@ -1,5 +1,7 @@
 # Local Job Pipeline
 
+[![CI](https://github.com/Tcx086/local-job-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Tcx086/local-job-pipeline/actions/workflows/ci.yml)
+
 Local Job Pipeline is a local-first Python workflow for job search planning, public posting collection, scoring, reporting, dashboard review, resume-profile organization, and manual application campaign planning.
 
 It is designed for any job seeker to configure on their own machine. Public examples use placeholder data only.
