@@ -4,6 +4,12 @@ Local Job Pipeline is a local-first Python workflow for job search planning, pub
 
 It is designed for any job seeker to configure on their own machine. Public examples use placeholder data only.
 
+![Local Job Pipeline dashboard overview](docs/assets/dashboard-screenshot.png)
+
+## Why This Exists
+
+Job searching creates a lot of scattered local state: searches, duplicate postings, fit notes, reports, resume drafts, and application follow-ups. This project keeps that workflow local and review-first, so a user can prioritize real opportunities without auto-submitting applications or storing sensitive application answers in a public repository.
+
 ## What It Does
 
 - Builds a configurable search plan from `config/search_scope.yaml`.
