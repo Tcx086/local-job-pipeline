@@ -59,6 +59,68 @@ SKIP_PATTERNS = [
     (re.compile(r"\b(sales development representative|business development representative|account executive|cold calling)\b", re.I), "pure sales role"),
 ]
 
+PENALTY_REASON_LABELS = {
+    "senior_title": "senior title",
+    "senior_or_lead_level": "senior/lead level",
+    "manager_title": "manager/director title",
+    "three_plus_years": "3+ years requirement",
+    "five_plus_years": "5+ years requirement",
+    "high_years_required": "high-years requirement",
+    "local_presence_required": "local presence required",
+    "local_presence_required_without_sponsorship": "local presence without sponsorship",
+    "citizenship_only": "citizenship-only wording",
+    "work_authorization_restricted": "work authorization restriction",
+    "sponsorship_not_available": "no sponsorship",
+    "masters_required": "master's required",
+    "masters_preferred": "master's preferred",
+    "cpp_required": "C++ required",
+    "low_latency_cpp": "low-latency C++",
+    "pure_quant_track": "pure quant track",
+    "no_description": "missing description",
+}
+
+SHORT_EFFORT_LABELS = {
+    "deep_tailor": "deep",
+    "standard_tailor": "standard",
+    "quick_apply": "quick",
+    "hold": "hold",
+    "skip": "skip",
+}
+
+SHORT_REASON_LABELS = {
+    "senior_title": "senior",
+    "senior_or_lead_level": "senior/lead/staff",
+    "manager_title": "manager",
+    "three_plus_years": "3+ yrs",
+    "five_plus_years": "5+ yrs",
+    "high_years_required": "high yrs",
+    "local_presence_required": "local required",
+    "local_presence_required_without_sponsorship": "local/no sponsorship",
+    "citizenship_only": "citizenship",
+    "work_authorization_restricted": "work auth",
+    "sponsorship_not_available": "no sponsorship",
+    "masters_required": "master req",
+    "masters_preferred": "master pref",
+    "cpp_required": "C++",
+    "low_latency_cpp": "low-latency C++",
+    "pure_quant_track": "pure quant",
+    "no_description": "no desc",
+}
+
+SEVERE_KEYWORD_REASON_LABELS = {"lead", "senior", "staff", "principal"}
+SENIOR_KEYWORD_RED_FLAGS = {"senior_title", "senior_or_lead_level"}
+BASE_RED_FLAG_PENALTIES = {
+    "senior_or_lead_level": 30,
+    "high_years_required": 25,
+    "phd_required": 30,
+    "work_authorization_restricted": 40,
+    "low_latency_cpp": 25,
+    "commission_or_unpaid": 30,
+    "no_description": 3,
+    "local_presence_required_without_sponsorship": 20,
+    "pure_quant_track": 20,
+}
+
 CAMPAIGN_FIELDS = [
     "campaign_date",
     "campaign_priority",
@@ -215,16 +277,161 @@ def _has_skip_disqualifier(job: dict[str, Any]) -> tuple[bool, str]:
     return False, ""
 
 
-def _has_severe_red_flag(job: dict[str, Any]) -> bool:
-    flags = _red_flags(job)
-    if flags & SEVERE_RED_FLAGS:
-        return True
+def _soft_penalty_lookup(job: dict[str, Any]) -> dict[str, int]:
+    lookup: dict[str, int] = {}
+    for item in _as_list(job.get("soft_penalties")):
+        if not isinstance(item, dict):
+            continue
+        rule = str(item.get("rule") or "").strip().lower()
+        if not rule:
+            continue
+        try:
+            penalty = int(item.get("applied_penalty", item.get("penalty") or 0) or 0)
+        except (TypeError, ValueError):
+            penalty = 0
+        if penalty:
+            lookup[rule] = penalty
+    return lookup
+
+
+def _penalty_label(rule_id: str) -> str:
+    return PENALTY_REASON_LABELS.get(rule_id, rule_id.replace("_", " "))
+
+
+def _flag_reason(flag: str, penalties: dict[str, int]) -> str:
+    penalty = penalties.get(flag)
+    label = _penalty_label(flag)
+    return f"{label} -{penalty}" if penalty else label
+
+
+def _short_effort_label(effort: str) -> str:
+    return SHORT_EFFORT_LABELS.get(effort, effort.replace("_tailor", "").replace("_apply", ""))
+
+
+def _short_reason_label(rule_id: str) -> str:
+    return SHORT_REASON_LABELS.get(rule_id, _penalty_label(rule_id))
+
+
+def _short_flag_reason(flag: str, penalties: dict[str, int]) -> str:
+    penalty = penalties.get(flag)
+    if penalty is None:
+        penalty = BASE_RED_FLAG_PENALTIES.get(flag)
+    label = _short_reason_label(flag)
+    return f"{label} -{abs(penalty)}" if penalty else label
+
+
+def _short_keyword_reason(keyword: str) -> str:
+    normalized = keyword.lower().rstrip(".")
+    return "senior" if normalized == "sr" else normalized
+
+
+def _unique_reasons(reasons: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for reason in reasons:
+        text = str(reason or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def _short_free_text_reason(reason: Any) -> str:
+    text = str(reason or "").strip().rstrip(".")
+    if not text:
+        return "hard skip"
+    lower = text.lower()
+    if "life sciences" in lower or "biotech" in lower:
+        return "life sci mismatch"
+    return text
+
+
+def _compact_reason_groups(reasons: list[str]) -> list[str]:
+    unique = _unique_reasons(reasons)
+    keyword_items: list[tuple[str, str]] = []
+    for reason in unique:
+        match = re.fullmatch(r"(lead|senior|staff|principal)( -\d+)?", reason)
+        if match:
+            keyword_items.append((match.group(1), match.group(2) or ""))
+    if len(keyword_items) < 2:
+        return unique
+
+    suffixes = {suffix for _, suffix in keyword_items}
+    grouped_suffix = next(iter(suffixes)) if len(suffixes) == 1 else ""
+    grouped_keywords = "/".join(keyword for keyword, _ in keyword_items) + grouped_suffix
+    compacted: list[str] = []
+    inserted = False
+    for reason in unique:
+        if re.fullmatch(r"(lead|senior|staff|principal)( -\d+)?", reason):
+            if not inserted:
+                compacted.append(grouped_keywords)
+                inserted = True
+            continue
+        compacted.append(reason)
+    return compacted
+
+
+def _format_campaign_reason(score: int, effort: str, reasons: list[str]) -> str:
+    reason_text = "; ".join(_compact_reason_groups(reasons))
+    base = f"{score} -> {_short_effort_label(effort)}"
+    return f"{base}: {reason_text}" if reason_text else base
+
+
+def _campaign_penalty_reasons(job: dict[str, Any]) -> list[str]:
+    penalties = _soft_penalty_lookup(job)
+    red_flags = _red_flags(job)
+    reasons = []
+    for rule in sorted(penalties):
+        if rule in SENIOR_KEYWORD_RED_FLAGS:
+            continue
+        if rule == "five_plus_years" and "high_years_required" in red_flags:
+            continue
+        reasons.append(_short_flag_reason(rule, penalties))
+    for flag in sorted(red_flags):
+        if flag in penalties or flag in SENIOR_KEYWORD_RED_FLAGS:
+            continue
+        if flag == "five_plus_years" and "high_years_required" in red_flags:
+            continue
+        reasons.append(_short_flag_reason(flag, penalties))
+    return _unique_reasons(reasons)
+
+
+def _severe_red_flag_reasons(job: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    penalties = _soft_penalty_lookup(job)
+    red_flags = _red_flags(job)
+    for flag in sorted((red_flags & SEVERE_RED_FLAGS) - SENIOR_KEYWORD_RED_FLAGS):
+        if flag == "five_plus_years" and "high_years_required" in red_flags:
+            continue
+        reasons.append(_short_flag_reason(flag, penalties))
+
+    keyword_penalty = BASE_RED_FLAG_PENALTIES["senior_or_lead_level"] if "senior_or_lead_level" in red_flags else penalties.get("senior_title")
+    title_text = str(job.get("title") or "")
+    for match in re.finditer(r"\b(senior|sr\.?|staff|principal|lead)\b", title_text, flags=re.I):
+        label = _short_keyword_reason(match.group(0))
+        reason = f"{label} -{keyword_penalty}" if keyword_penalty else label
+        if reason not in reasons:
+            reasons.append(reason)
+
     text = _job_text(job)
-    return bool(
-        re.search(r"\b(senior|sr\.?|staff|principal|lead)\b", text)
-        or re.search(r"\b(citizenship required|citizens only|must be a citizen)\b", text)
-        or re.search(r"\b(must already be based|currently based)\b.{0,100}\b(singapore|hong kong)\b", text)
-    )
+    for match in re.finditer(r"\b(senior|sr\.?|staff|principal|lead)\b", text, flags=re.I):
+        label = _short_keyword_reason(match.group(0))
+        reason = f"{label} -{keyword_penalty}" if keyword_penalty else label
+        if reason not in reasons:
+            reasons.append(reason)
+    for pattern, label in [
+        (r"\b(citizenship required|citizens only|must be a citizen)\b", "citizenship"),
+        (r"\b(must already be based|currently based)\b.{0,100}\b(singapore|hong kong)\b", "local required"),
+    ]:
+        match = re.search(pattern, text, flags=re.I)
+        if match:
+            reasons.append(label)
+    return _unique_reasons(reasons)
+
+
+def _has_severe_red_flag(job: dict[str, Any]) -> bool:
+    return bool(_severe_red_flag_reasons(job))
 
 
 def _norm_company(value: Any) -> str:
@@ -268,38 +475,35 @@ def classify_campaign_job(job: dict[str, Any], config: dict[str, Any] | None = N
     campaign = _campaign_settings(config)
     thresholds = campaign.get("score_thresholds") or {}
     score = _score(job)
-    reasons: list[str] = []
     if _hard_skip(job):
-        return {"application_effort": "skip", "campaign_reason": str(job.get("filter_reason") or "hard skip")}
+        reason = _short_free_text_reason(job.get("filter_reason") or "hard skip")
+        return {"application_effort": "skip", "campaign_reason": _format_campaign_reason(score, "skip", [reason])}
     disqualified, disqualifier = _has_skip_disqualifier(job)
     if disqualified:
-        return {"application_effort": "skip", "campaign_reason": f"skip disqualifier: {disqualifier}"}
+        return {"application_effort": "skip", "campaign_reason": _format_campaign_reason(score, "skip", [disqualifier])}
     if score >= int(thresholds.get("deep_tailor") or 70):
         effort = "deep_tailor"
-        reasons.append(f"score {score} >= deep threshold")
     elif score >= int(thresholds.get("standard_tailor") or 55):
         effort = "standard_tailor"
-        reasons.append(f"score {score} in standard range")
     elif score >= int(thresholds.get("quick_apply") or 35):
         effort = "quick_apply"
-        reasons.append(f"score {score} in quick apply range")
     elif score >= int(thresholds.get("hold") or 25):
         effort = "hold"
-        reasons.append(f"score {score} in hold range")
     else:
         effort = "skip"
-        reasons.append(f"score {score} below hold threshold")
 
-    if effort == "deep_tailor" and _has_severe_red_flag(job):
+    reasons = list(_campaign_penalty_reasons(job))
+    severe_reasons = _severe_red_flag_reasons(job)
+    reasons.extend(severe_reasons)
+    if effort == "deep_tailor" and severe_reasons:
         effort = "standard_tailor"
-        reasons.append("severe red flag caps effort at standard_tailor")
     if effort == "standard_tailor" and is_priority_company(job.get("company") or job.get("canonical_company"), config):
-        if _has_severe_red_flag(job):
-            reasons.append("priority company found but severe red flag prevents promotion")
+        if severe_reasons:
+            reasons.append("priority blocked")
         else:
             effort = "deep_tailor"
-            reasons.append("priority company promoted standard_tailor to deep_tailor")
-    return {"application_effort": effort, "campaign_reason": "; ".join(reasons)}
+            reasons.append("priority")
+    return {"application_effort": effort, "campaign_reason": _format_campaign_reason(score, effort, reasons)}
 
 
 def choose_resume_profile(job: dict[str, Any], config: dict[str, Any] | None = None) -> str:

@@ -71,8 +71,16 @@ class SchedulerPlanTests(unittest.TestCase):
 
     def test_run_once_default_does_not_call_resume_generator(self):
         with tempfile.TemporaryDirectory() as tmp:
-            db = Path(tmp) / "jobs.sqlite"
-            with patch("job_pipeline.scheduler.generate_resume", side_effect=AssertionError("resume generated")) as generate_resume:
+            root = Path(tmp)
+            db = root / "jobs.sqlite"
+            with (
+                patch("job_pipeline.scheduler.RAW_DIR", root / "raw"),
+                patch("job_pipeline.scheduler.record_search_coverage", return_value={"csv": ""}),
+                patch("job_pipeline.scheduler.record_source_health", return_value={"csv": ""}),
+                patch("job_pipeline.scheduler.record_score_calibration", return_value={"csv": ""}),
+                patch("job_pipeline.scheduler.generate_reports", return_value={"csv": ""}),
+                patch("job_pipeline.scheduler.generate_resume", side_effect=AssertionError("resume generated")) as generate_resume,
+            ):
                 summary = scheduler.run_once(
                     use_sample=True,
                     mode="normal",

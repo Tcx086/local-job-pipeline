@@ -229,8 +229,7 @@ def collect_red_flags(job: dict[str, Any]) -> tuple[int, list[str]]:
     penalty = 0
     flags: list[str] = []
     for pattern, points, flag in NEGATIVE_RULES:
-        target_text = title_text if flag == "senior_or_lead_level" else text
-        if re.search(pattern, target_text):
+        if re.search(pattern, text):
             penalty += points
             flags.append(flag)
     if QUANT_RE.search(text) and not OPS_ESCAPE_RE.search(text):
@@ -288,6 +287,8 @@ def score_job(job: dict[str, Any]) -> dict[str, Any]:
     enriched = apply_filter_policy(enriched)
     if enriched.get("hard_skip"):
         enriched["score_band"] = "Hard skip"
+        if enriched.get("filter_reason"):
+            enriched["reason_to_apply"] = f"Filtered: {enriched['filter_reason']}"
     else:
         enriched["recommendation"] = recommendation_for_score(int(enriched.get("score") or 0))
         enriched["score_band"] = score_band(int(enriched.get("score") or 0))

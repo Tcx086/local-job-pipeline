@@ -125,7 +125,29 @@ def _configured_country_options() -> list[str]:
     return options
 def _jobs_df() -> pd.DataFrame:
     rows = get_jobs(DEFAULT_DB, include_inactive=True)
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if not df.empty and "is_new_since_last_run" in df.columns:
+        df["new_since_last_run"] = df["is_new_since_last_run"].fillna(0).astype(int).astype(bool)
+    return df
+
+
+def _latest_collection_summary() -> dict[str, Any]:
+    rows = get_source_health_rows(DEFAULT_DB)
+    if not rows:
+        return {}
+    latest_run = str(rows[0].get("run_id") or "")
+    latest_at = max(str(row.get("last_run_at") or "") for row in rows)
+    raw_count = sum(int(row.get("raw_count_last_run") or 0) for row in rows)
+    normalized_count = sum(int(row.get("normalized_count_last_run") or 0) for row in rows)
+    healthy_sources = sum(1 for row in rows if str(row.get("status") or "") == "healthy")
+    return {
+        "run_id": latest_run,
+        "last_run_at": latest_at,
+        "raw_count": raw_count,
+        "normalized_count": normalized_count,
+        "healthy_sources": healthy_sources,
+        "source_count": len(rows),
+    }
 
 
 def _safe_list(df: pd.DataFrame, column: str) -> list[str]:
@@ -134,7 +156,10 @@ def _safe_list(df: pd.DataFrame, column: str) -> list[str]:
     return sorted(str(v) for v in df[column].dropna().unique() if str(v))
 
 POST_APPLY_STATUSES = {"applied", "interview", "rejected"}
-CAMPAIGN_APPLICATION_BUCKETS = ["Not applied", "Applied", "All"]
+CAMPAIGN_APPLICATION_BUCKETS = ["Actionable", "Not applied", "Applied", "Skipped", "All"]
+CAMPAIGN_NON_ACTION_STATUSES = {"skipped", "archived", "deferred"}
+CAMPAIGN_EFFORT_ORDER = {"deep_tailor": 0, "standard_tailor": 1, "quick_apply": 2, "hold": 3, "skip": 99}
+CAMPAIGN_STATUS_ORDER = {"queued": 0, "moved_to_hold": 1, "deferred": 2, "applied": 90, "skipped": 99, "archived": 99}
 
 
 def _lower_text_series(df: pd.DataFrame, column: str) -> pd.Series:
@@ -166,23 +191,66 @@ def _campaign_applied_mask(df: pd.DataFrame) -> pd.Series:
     return (campaign_status == "applied") | application_status.isin(POST_APPLY_STATUSES) | applied_at
 
 
+def _bool_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if column not in df.columns:
+        return pd.Series(False, index=df.index, dtype=bool)
+    return df[column].fillna(False).map(_truthy).astype(bool)
+
+
+def _campaign_skipped_mask(df: pd.DataFrame) -> pd.Series:
+    if df.empty:
+        return pd.Series(False, index=df.index, dtype=bool)
+    campaign_status = _lower_text_series(df, "campaign_status")
+    effort = _lower_text_series(df, "application_effort")
+    hard_skip = _bool_series(df, "hard_skip")
+    return campaign_status.isin(CAMPAIGN_NON_ACTION_STATUSES) | (effort == "skip") | hard_skip
+
+
+def _campaign_actionable_mask(df: pd.DataFrame) -> pd.Series:
+    if df.empty:
+        return pd.Series(False, index=df.index, dtype=bool)
+    campaign_status = _lower_text_series(df, "campaign_status")
+    return (campaign_status == "queued") & ~_campaign_applied_mask(df) & ~_campaign_skipped_mask(df)
+
+
 def _campaign_df_with_application_bucket(df: pd.DataFrame) -> pd.DataFrame:
     output = df.copy()
     if output.empty:
         output["application_bucket"] = []
         return output
     applied_mask = _campaign_applied_mask(output)
-    output["application_bucket"] = applied_mask.map({True: "Applied", False: "Not applied"})
+    skipped_mask = _campaign_skipped_mask(output)
+    actionable_mask = _campaign_actionable_mask(output)
+    output["application_bucket"] = "Not applied"
+    output.loc[actionable_mask, "application_bucket"] = "Actionable"
+    output.loc[skipped_mask, "application_bucket"] = "Skipped"
+    output.loc[applied_mask, "application_bucket"] = "Applied"
     return output
 
 
 def _filter_campaign_bucket(df: pd.DataFrame, bucket: str) -> pd.DataFrame:
     bucket_series = df.get("application_bucket", pd.Series("", index=df.index))
+    if bucket == "Actionable":
+        return df[bucket_series == "Actionable"].copy()
     if bucket == "Applied":
         return df[bucket_series == "Applied"].copy()
+    if bucket == "Skipped":
+        return df[bucket_series == "Skipped"].copy()
     if bucket == "Not applied":
-        return df[bucket_series == "Not applied"].copy()
+        return df[bucket_series.isin(["Actionable", "Not applied"])].copy()
     return df.copy()
+
+
+def _sort_campaign_display(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+    output = df.copy()
+    output["_skip_sort"] = _campaign_skipped_mask(output).astype(int)
+    output["_effort_sort"] = _lower_text_series(output, "application_effort").map(CAMPAIGN_EFFORT_ORDER).fillna(50).astype(int)
+    output["_status_sort"] = _lower_text_series(output, "campaign_status").map(CAMPAIGN_STATUS_ORDER).fillna(50).astype(int)
+    output["_score_sort"] = -output.get("score", pd.Series(0, index=output.index)).fillna(0).astype(int)
+    output = output.sort_values(["_skip_sort", "_effort_sort", "_status_sort", "_score_sort", "company", "title"])
+    return output.drop(columns=["_skip_sort", "_effort_sort", "_status_sort", "_score_sort"])
 
 
 def _resolve_dashboard_path(path_text: Any) -> Path:
@@ -371,6 +439,14 @@ def _render_apply_shortcuts(detail: dict[str, Any], prefix: str) -> None:
 
 def overview(df: pd.DataFrame) -> None:
     st.header("Overview")
+    latest = _latest_collection_summary()
+    if latest:
+        st.caption(
+            "Last collection: "
+            f"{latest['last_run_at']} UTC | {latest['run_id']} | "
+            f"raw {latest['raw_count']} / normalized {latest['normalized_count']} | "
+            f"healthy sources {latest['healthy_sources']}/{latest['source_count']}"
+        )
     today_new = int(((df.get("freshness_label") == "new_today") | (df.get("is_new_since_last_run") == 1)).sum()) if not df.empty else 0
     high_score = int((df.get("score", pd.Series(dtype=int)).fillna(0).astype(int) >= 70).sum()) if not df.empty else 0
     must_apply = int((df.get("score", pd.Series(dtype=int)).fillna(0).astype(int) >= 85).sum()) if not df.empty else 0
@@ -409,16 +485,19 @@ def job_radar(df: pd.DataFrame) -> None:
     status = c7.multiselect("Status", _safe_list(df, "status"), key="radar_status")
     score_range = c8.slider("Score range", 0, 100, (DASHBOARD_DEFAULT_MIN_SCORE, 100))
     keyword = st.text_input("Keyword search")
+    only_new = st.checkbox("Only new since last collection", key="radar_only_new")
 
     for column, values in [("country", country), ("company", company), ("recommendation", recommendation), ("freshness_label", freshness), ("role_category", role), ("source", source), ("status", status)]:
         if values:
             filtered = filtered[filtered[column].fillna("").isin(values)]
+    if only_new and "new_since_last_run" in filtered:
+        filtered = filtered[filtered["new_since_last_run"]]
     filtered = filtered[filtered["score"].fillna(0).astype(int).between(score_range[0], score_range[1])]
     if keyword:
         haystack = filtered.fillna("").astype(str).agg(" ".join, axis=1).str.lower()
         filtered = filtered[haystack.str.contains(keyword.lower(), regex=False)]
 
-    display_cols = ["score", "score_band", "recommendation", "freshness_label", "title", "company", "country", "location", "role_category", "seniority", "posted_at", "first_seen_at", "source", "apply_url", "status", "next_action", "canonical_job_id"]
+    display_cols = ["new_since_last_run", "score", "score_band", "recommendation", "freshness_label", "title", "company", "country", "location", "role_category", "seniority", "posted_at", "first_seen_at", "last_seen_at", "updated_at", "source", "apply_url", "status", "next_action", "canonical_job_id"]
     _dataframe(filtered[[c for c in display_cols if c in filtered.columns]], use_container_width=True, hide_index=True)
 
     manual_review = filtered[(filtered["score"].fillna(0).astype(int) >= 35) & (filtered["score"].fillna(0).astype(int) < 55)]
@@ -785,6 +864,7 @@ def application_campaign_page(df: pd.DataFrame) -> None:
             filtered = filtered[filtered[column].fillna("").isin(values)]
     if "score" in filtered:
         filtered = filtered[filtered["score"].fillna(0).astype(int).between(score_range[0], score_range[1])]
+    filtered = _sort_campaign_display(filtered)
 
     display_cols = [
         "score", "score_band", "application_effort", "title", "company", "country", "location",

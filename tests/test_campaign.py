@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_pipeline.campaign import build_campaign_row, build_daily_campaign, classify_application_effort
+from job_pipeline.campaign import build_campaign_row, build_daily_campaign, classify_application_effort, classify_campaign_job
 from job_pipeline.dashboard import DASHBOARD_TAB_LABELS, _generate_tailored_resume_for_campaign
 from job_pipeline.database import connect, get_job_detail, replace_campaign_items, save_campaign_items, update_campaign_item_status, upsert_job
 
@@ -51,8 +51,36 @@ class CampaignTests(unittest.TestCase):
         promoted = _job(6, score=60, company="RBC")
         self.assertEqual(classify_application_effort(promoted, config), "deep_tailor")
 
-        senior = _job(7, score=60, company="RBC", title="Senior Market Data Analyst", red_flags=["senior_title"])
-        self.assertEqual(classify_application_effort(senior, config), "standard_tailor")
+        senior = _job(7, score=60, company="RBC", title="Senior Market Data Analyst", red_flags=["senior_or_lead_level", "senior_title"])
+        result = classify_campaign_job(senior, config)
+        self.assertEqual(result["application_effort"], "standard_tailor")
+        self.assertEqual(result["campaign_reason"], "60 -> standard: senior -30; priority blocked")
+
+    def test_description_senior_or_staff_mentions_cap_effort_with_reason(self):
+        job = _job(
+            8,
+            score=91,
+            title="Business Analyst",
+            description="Build reporting for senior leadership and train internal staff on dashboards.",
+        )
+
+        result = classify_campaign_job(job)
+
+        self.assertEqual(result["application_effort"], "standard_tailor")
+        self.assertEqual(result["campaign_reason"], "91 -> standard: senior/staff")
+
+    def test_penalty_reasons_include_specific_keywords(self):
+        job = _job(
+            9,
+            score=53,
+            red_flags=["five_plus_years", "high_years_required"],
+            soft_penalties=[{"rule": "five_plus_years", "penalty": 20}],
+        )
+
+        result = classify_campaign_job(job)
+
+        self.assertEqual(result["application_effort"], "quick_apply")
+        self.assertEqual(result["campaign_reason"], "53 -> quick: high yrs -25")
 
     def test_daily_campaign_respects_max_per_company_per_day(self):
         jobs = [_job(i, score=90, company="RBC", title=f"Market Data Analyst {i}") for i in range(5)]
