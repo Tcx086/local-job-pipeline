@@ -415,10 +415,13 @@ def _choose_primary(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[
     for key, value in fallback.items():
         if merged.get(key) in (None, "", []):
             merged[key] = value
-    merged["score"] = max(int(existing.get("score") or 0), int(incoming.get("score") or 0))
-    if int(incoming.get("score") or 0) >= int(existing.get("score") or 0):
+    incoming_has_score = incoming.get("score") not in (None, "")
+    if incoming_has_score:
+        merged["score"] = int(incoming.get("score") or 0)
         for key in ["recommendation", "matched_keywords", "missing_keywords", "red_flags", "reason_to_apply", "resume_file_generated", "scheduler_resume_draft_path", "hard_skip", "soft_penalties", "filter_reason"]:
             merged[key] = incoming.get(key, merged.get(key))
+    else:
+        merged["score"] = int(existing.get("score") or 0)
     return merged
 
 

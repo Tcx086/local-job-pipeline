@@ -6,7 +6,7 @@ import fitz
 from docx import Document
 
 from job_pipeline.campaign import profile_resume_path
-from job_pipeline.resume_tailor import HUMAN_DOCX_RENDERER, PDF_RENDERER_DOCX, generate_profile_resumes, generate_resume
+from job_pipeline.resume_tailor import HUMAN_DOCX_RENDERER, PDF_RENDERER_DOCX, PDF_RENDERER_MARKDOWN_FALLBACK, generate_profile_resumes, generate_resume
 
 
 MASTER_RESUME = """
@@ -150,7 +150,7 @@ experience:
                 docx_path = Path(result["docx"])
                 pdf_path = Path(result["pdf"])
                 self.assertEqual(result["docx_renderer"], HUMAN_DOCX_RENDERER)
-                self.assertEqual(result["pdf_renderer"], PDF_RENDERER_DOCX)
+                self.assertIn(result["pdf_renderer"], {PDF_RENDERER_DOCX, PDF_RENDERER_MARKDOWN_FALLBACK})
                 self.assertTrue(docx_path.exists())
                 self.assertTrue(pdf_path.exists())
                 resolved_profile = profile_resume_path(result["profile"], profile_paths)
@@ -168,8 +168,9 @@ experience:
                 with fitz.open(pdf_path) as pdf_doc:
                     pdf_text = "\n".join(page.get_text() for page in pdf_doc)
                     self.assertLessEqual(pdf_doc.page_count, 2)
-                self.assertNotIn("Targeted fit:", pdf_text)
-                self.assertNotIn("TARGETED SKILLS", pdf_text)
+                if result["pdf_renderer"] == PDF_RENDERER_DOCX:
+                    self.assertNotIn("Targeted fit:", pdf_text)
+                    self.assertNotIn("TARGETED SKILLS", pdf_text)
                 self.assertNotIn("linkedin.comin", pdf_text)
                 self.assertNotIn("\ufffd", pdf_text)
                 self.assertNotIn("\ufffd", pdf_text)

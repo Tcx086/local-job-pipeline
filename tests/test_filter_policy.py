@@ -27,6 +27,21 @@ class FilterPolicyTests(unittest.TestCase):
         self.assertLess(result["score"], 75)
         self.assertIn("senior_title", result["red_flags"])
 
+    def test_independent_soft_penalty_is_not_swallowed_by_core_penalty(self):
+        job = {
+            "title": "Senior Risk Analyst",
+            "description": "Requires 3+ years risk reporting experience.",
+            "score": 45,
+            "red_flags": ["senior_or_lead_level"],
+            "score_breakdown": {"penalty": 30},
+        }
+
+        result = apply_filter_policy(job)
+
+        self.assertEqual(result["score"], 35)
+        self.assertIn({"rule": "three_plus_years", "penalty": 10, "applied_penalty": 10}, result["soft_penalties"])
+        self.assertIn({"rule": "senior_title", "penalty": 25, "applied_penalty": 0}, result["soft_penalties"])
+
     def test_manager_mentions_in_description_do_not_create_manager_title_flag(self):
         job = {
             "title": "Business Systems Analyst",
@@ -63,6 +78,24 @@ class FilterPolicyTests(unittest.TestCase):
         self.assertEqual(result["recommendation"], "Hard skip")
         self.assertIn("seven_plus_years", result["filter_rule_ids"])
 
+    def test_life_sciences_research_industry_is_hard_skip(self):
+        job = {
+            "title": "Data Analyst",
+            "company": "Nomic",
+            "description": (
+                "Make biology easier to measure by building protein data pipelines for "
+                "proteomics, drug discovery, therapeutic development, and biotech research."
+            ),
+            "score": 88,
+            "score_breakdown": {"penalty": 0},
+        }
+
+        result = apply_filter_policy(job)
+
+        self.assertTrue(result["hard_skip"])
+        self.assertEqual(result["score"], 0)
+        self.assertEqual(result["recommendation"], "Hard skip")
+        self.assertIn("non_target_life_sciences_research", result["filter_rule_ids"])
 
 if __name__ == "__main__":
     unittest.main()

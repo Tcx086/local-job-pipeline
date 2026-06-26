@@ -57,17 +57,20 @@ class DashboardTabsTests(unittest.TestCase):
 
         self.assertEqual(result["canonical_job_id"].tolist(), ["applied", "interview", "dated"])
 
-    def test_campaign_bucket_separates_applied_from_queue(self):
+    def test_campaign_bucket_separates_applied_skipped_and_actionable(self):
         df = pd.DataFrame(
             [
-                {"canonical_job_id": "queued", "campaign_status": "queued", "application_status": "new", "applied_at": ""},
-                {"canonical_job_id": "campaign_applied", "campaign_status": "applied", "application_status": "new", "applied_at": ""},
-                {"canonical_job_id": "application_applied", "campaign_status": "queued", "application_status": "applied", "applied_at": ""},
+                {"canonical_job_id": "queued", "campaign_status": "queued", "application_effort": "deep_tailor", "application_status": "new", "applied_at": "", "hard_skip": False},
+                {"canonical_job_id": "campaign_applied", "campaign_status": "applied", "application_effort": "deep_tailor", "application_status": "new", "applied_at": "", "hard_skip": False},
+                {"canonical_job_id": "application_applied", "campaign_status": "queued", "application_effort": "deep_tailor", "application_status": "applied", "applied_at": "", "hard_skip": False},
+                {"canonical_job_id": "skipped", "campaign_status": "skipped", "application_effort": "skip", "application_status": "new", "applied_at": "", "hard_skip": True},
             ]
         )
         bucketed = _campaign_df_with_application_bucket(df)
 
+        self.assertEqual(_filter_campaign_bucket(bucketed, "Actionable")["canonical_job_id"].tolist(), ["queued"])
         self.assertEqual(_filter_campaign_bucket(bucketed, "Not applied")["canonical_job_id"].tolist(), ["queued"])
+        self.assertEqual(_filter_campaign_bucket(bucketed, "Skipped")["canonical_job_id"].tolist(), ["skipped"])
         self.assertEqual(
             _filter_campaign_bucket(bucketed, "Applied")["canonical_job_id"].tolist(),
             ["campaign_applied", "application_applied"],

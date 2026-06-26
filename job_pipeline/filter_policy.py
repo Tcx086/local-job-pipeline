@@ -11,6 +11,12 @@ from .utils import CONFIG_DIR, load_yaml, normalize_text_escapes
 FILTER_POLICY_PATH = CONFIG_DIR / "filter_policy.yaml"
 OPS_ESCAPE_RE = re.compile(r"\b(data|operations|support|api|risk|market data|analyst)\b", re.I)
 FINTECH_ESCAPE_RE = re.compile(r"\b(fintech|crypto|digital assets|analyst|operations|data|api)\b", re.I)
+CORE_RULE_OVERLAPS = {
+    "senior_title": {"senior_or_lead_level"},
+    "five_plus_years": {"high_years_required"},
+    "low_latency_cpp": {"low_latency_cpp"},
+    "pure_quant_researcher_trader": {"pure_quant_track"},
+}
 
 
 def load_filter_policy(path: Path = FILTER_POLICY_PATH) -> dict[str, Any]:
@@ -29,14 +35,13 @@ def _job_text(job: dict[str, Any]) -> str:
     return normalize_text_escapes(" ".join(str(field or "") for field in fields)).lower()
 
 
-def _existing_penalty(job: dict[str, Any]) -> int:
-    breakdown = job.get("score_breakdown") or {}
-    if isinstance(breakdown, dict):
-        try:
-            return int(breakdown.get("penalty") or 0)
-        except (TypeError, ValueError):
-            return 0
-    return 0
+def _red_flag_set(job: dict[str, Any]) -> set[str]:
+    return {str(flag).strip() for flag in job.get("red_flags") or [] if str(flag).strip()}
+
+
+def _soft_rule_already_counted(rule_id: str, job: dict[str, Any]) -> bool:
+    overlaps = CORE_RULE_OVERLAPS.get(rule_id) or set()
+    return bool(overlaps & _red_flag_set(job))
 
 
 def _matches(pattern: Any, text: str) -> bool:
@@ -87,15 +92,15 @@ def apply_filter_policy(
         if not _matches(rule.get("pattern"), match_text) or _skip_soft_rule(rule_id, text, job):
             continue
         penalty = int(rule.get("penalty") or 0)
-        soft_penalties.append({"rule": rule_id, "penalty": penalty})
+        applied_penalty = 0 if _soft_rule_already_counted(rule_id, {**job, "red_flags": red_flags}) else penalty
+        soft_penalties.append({"rule": rule_id, "penalty": penalty, "applied_penalty": applied_penalty})
         red_flag = str(rule.get("red_flag") or rule_id)
         if red_flag:
             red_flags.append(red_flag)
 
     score = int(base_score if base_score is not None else job.get("score") or 0)
-    policy_penalty = sum(int(item.get("penalty") or 0) for item in soft_penalties)
-    extra_penalty = max(0, policy_penalty - _existing_penalty(job))
-    adjusted_score = max(0, score - extra_penalty) if adjust_score else score
+    policy_penalty = sum(int(item.get("applied_penalty", item.get("penalty") or 0) or 0) for item in soft_penalties)
+    adjusted_score = max(0, score - policy_penalty) if adjust_score else score
     hard_skip = bool(hard_reasons)
     if hard_skip:
         adjusted_score = 0
@@ -105,7 +110,9 @@ def apply_filter_policy(
     output["soft_penalties"] = soft_penalties
     output["red_flags"] = sorted(set(str(flag) for flag in red_flags if str(flag).strip()))
     output["filter_reason"] = "; ".join(hard_reasons) if hard_reasons else "; ".join(
-        f"{item['rule']} -{item['penalty']}" for item in soft_penalties if int(item.get("penalty") or 0) > 0
+        f"{item['rule']} -{item.get('applied_penalty', item['penalty'])}"
+        for item in soft_penalties
+        if int(item.get("applied_penalty", item.get("penalty") or 0) or 0) > 0
     )
     output["filter_rule_ids"] = hard_rule_ids + [str(item["rule"]) for item in soft_penalties]
     output["score"] = adjusted_score

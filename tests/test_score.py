@@ -47,7 +47,7 @@ class ScoreTests(unittest.TestCase):
         self.assertIn("low_latency_cpp", scored["red_flags"])
         self.assertIn("phd_required", scored["red_flags"])
 
-    def test_senior_mentions_in_description_do_not_create_senior_title_flag(self):
+    def test_senior_mentions_in_description_are_penalized(self):
         job = normalize_job(
             {
                 "title": "Data Analyst",
@@ -60,7 +60,8 @@ class ScoreTests(unittest.TestCase):
 
         scored = score_job(job)
 
-        self.assertNotIn("senior_or_lead_level", scored["red_flags"])
+        self.assertIn("senior_or_lead_level", scored["red_flags"])
+        self.assertLess(scored["score"], 55)
 
 
     def test_year_range_requirement_is_penalized(self):
