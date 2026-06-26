@@ -8,6 +8,8 @@ It is designed for any job seeker to configure on their own machine. Public exam
 
 ![Local Job Pipeline dashboard overview](docs/assets/dashboard-screenshot.png)
 
+Dashboard preview: review scored jobs, inspect search scope, track applications, and plan a daily manual application campaign.
+
 ## Why This Exists
 
 Job searching creates a lot of scattered local state: searches, duplicate postings, fit notes, reports, resume drafts, and application follow-ups. This project keeps that workflow local and review-first, so a user can prioritize real opportunities without auto-submitting applications or storing sensitive application answers in a public repository.

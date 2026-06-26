@@ -8,7 +8,20 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu full
+            os: ubuntu-latest
+            test_command: python -B -m pytest
+            install_libreoffice: true
+          - name: Windows core
+            os: windows-latest
+            test_command: python -B -m pytest -k "not test_profile_export_uses_docx_template_renderer"
+            install_libreoffice: false
 
     steps:
       - name: Check out repository
@@ -21,6 +34,7 @@ jobs:
           cache: pip
 
       - name: Install system dependencies
+        if: matrix.install_libreoffice
         run: |
           sudo apt-get update
           sudo apt-get install -y libreoffice
@@ -31,7 +45,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Run tests
-        run: python -B -m pytest
+        run: ${{ matrix.test_command }}
 
       - name: Verify setup wizard
         run: python -B -m job_pipeline.setup_wizard --dry-run
