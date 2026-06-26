@@ -1,0 +1,85 @@
+hard_skip_rules:
+  - id: unpaid_internship
+    pattern: "\\b(unpaid internship|unpaid intern|volunteer internship)\\b"
+    reason: "Unpaid internship."
+  - id: commission_only
+    pattern: "\\bcommission[- ]only\\b|\\b100% commission\\b"
+    reason: "Commission-only role."
+  - id: scam_like
+    pattern: "\\bcrypto investment guaranteed\\b|\\bpay to apply\\b|\\btraining fee\\b"
+    reason: "Scam-like wording."
+  - id: no_legal_work_possibility
+    pattern: "\\b(no sponsorship|sponsorship not available)\\b[^.]{0,120}\\b(must be authorized|must already be authorized)\\b"
+    reason: "Clearly states no viable work authorization path."
+  - id: security_clearance
+    pattern: "\\b(government security clearance|active security clearance|secret clearance|top secret)\\b"
+    reason: "Requires government security clearance."
+  - id: citizenship_only
+    pattern: "\\b(citizenship required|citizens only|must be a citizen|canadian citizens only|singapore citizens only|hong kong citizens only)\\b"
+    reason: "Citizenship-only requirement."
+  - id: active_local_license
+    pattern: "\\b(active local license|required local license|licensed representative required)\\b"
+    reason: "Requires active local license."
+  - id: phd_research_role
+    pattern: "\\b(ph\\.?d|doctorate)\\b[^.]{0,120}\\b(research scientist|quant researcher|research role|researcher)\\b"
+    reason: "PhD explicitly required for research role."
+  - id: seven_plus_years
+    pattern: "\\b(7\\+|8\\+|9\\+|10\\+|7|8|9|10|seven|eight|nine|ten)\\s*(years|yrs)\\b"
+    reason: "Requires or strongly prefers 7+ years of experience."
+  - id: senior_8_plus
+    pattern: "\\b(senior|sr\\.?|staff|principal|lead|manager|director)\\b[^.]{0,160}\\b(8\\+|9\\+|10\\+|8|9|10|eight|nine|ten)\\s*(years|yrs)\\b"
+    reason: "Senior/manager role with 8+ years requirement."
+
+soft_penalty_rules:
+  - id: senior_title
+    pattern: "\\b(senior|sr\\.?|staff|principal|lead)\\b"
+    penalty: 25
+    red_flag: senior_title
+  - id: manager_title
+    pattern: "\\b(manager|head of|director)\\b"
+    penalty: 25
+    red_flag: manager_title
+  - id: five_plus_years
+    pattern: "\\b(5\\+|6\\+|7\\+|5|6|7|five|six|seven)\\s*(years|yrs)\\b"
+    penalty: 20
+    red_flag: five_plus_years
+  - id: three_plus_years
+    pattern: "\\b(3\\+|4\\+|3|4|three|four)\\s*(years|yrs)\\b"
+    penalty: 10
+    red_flag: three_plus_years
+  - id: master_preferred
+    pattern: "\\b(master'?s|msc|mba)\\b[^.]{0,80}\\b(preferred|nice to have|plus)\\b"
+    penalty: 5
+    red_flag: masters_preferred
+  - id: master_required
+    pattern: "\\b(master'?s|msc|mba)\\b[^.]{0,80}\\b(required|must have)\\b"
+    penalty: 15
+    red_flag: masters_required
+  - id: cpp_required
+    pattern: "\\bc\\+\\+\\b[^.]{0,80}\\b(required|must have|expert)\\b"
+    penalty: 15
+    red_flag: cpp_required
+  - id: low_latency_cpp
+    pattern: "\\b(low latency|hft)\\b[^.]{0,120}\\bc\\+\\+\\b"
+    penalty: 25
+    red_flag: low_latency_cpp
+  - id: cantonese_required
+    pattern: "\\bcantonese\\b[^.]{0,80}\\b(required|must|native|fluent)\\b"
+    penalty: 0
+    red_flag: cantonese_required
+  - id: local_presence_sg_hk
+    pattern: "\\b(must already be based|currently based)\\b[^.]{0,80}\\b(singapore|hong kong)\\b"
+    penalty: 20
+    red_flag: local_presence_required
+  - id: sponsorship_not_available
+    pattern: "\\b(sponsorship not available|no visa sponsorship|unable to sponsor)\\b"
+    penalty: 25
+    red_flag: sponsorship_not_available
+  - id: pure_sales_bd
+    pattern: "\\b(sales development|business development|account executive|cold calling)\\b"
+    penalty: 15
+    red_flag: sales_bd_heavy
+  - id: pure_quant_researcher_trader
+    pattern: "\\b(quant researcher|quantitative researcher|quant trader)\\b"
+    penalty: 20
+    red_flag: pure_quant_track

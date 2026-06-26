@@ -1,0 +1,12 @@
+﻿# Example only. Replace with your real finance operations evidence before using.
+profile_name: finance_operations
+summary_options:
+  - "Finance operations candidate with interest in reconciliations, controls, and reporting accuracy."
+skills:
+  - Reconciliation
+  - Excel
+  - Risk reporting
+  - Data validation
+projects:
+  - name: Example Reconciliation Tracker
+    description: "Built a sample tracker to compare transaction totals across two placeholder files."

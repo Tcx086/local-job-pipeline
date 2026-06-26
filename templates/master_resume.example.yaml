@@ -1,0 +1,55 @@
+﻿# Copy to templates/master_resume.yaml and replace every placeholder with your real experience.
+# The generator must not invent employers, dates, degrees, or achievements.
+name: "Your Name"
+location: "City, Region"
+headline: "Data and operations candidate"
+contacts:
+  email: "you@example.com"
+  phone: ""
+  linkedin: ""
+
+summary:
+  - "Data-focused candidate with experience in reporting, spreadsheet analysis, and operational problem solving."
+  - "Comfortable turning messy information into clear summaries, checklists, and dashboards."
+
+skills:
+  programming_data:
+    - Excel
+    - SQL
+    - Python
+    - Reporting
+  workflow_tools:
+    - Documentation
+    - Spreadsheet modeling
+    - Process tracking
+  operations:
+    - Data validation
+    - Reconciliation
+    - Stakeholder communication
+
+projects:
+  - name: Example Data Cleaning Project
+    type: Personal project
+    dates: "YYYY"
+    bullets:
+      - "Cleaned and validated a sample dataset for reporting accuracy."
+      - "Built a simple dashboard from placeholder data."
+
+experience:
+  - title: Example Operations Assistant
+    company: Example Company
+    location: Example City
+    dates: "YYYY-YYYY"
+    bullets:
+      - "Replace this with a real, evidence-backed achievement."
+      - "Use numbers only when they are true and verifiable."
+
+education:
+  - degree: Example Degree
+    school: Example School
+    date: "YYYY"
+    details:
+      - "Relevant coursework or training, if accurate."
+
+languages:
+  - English

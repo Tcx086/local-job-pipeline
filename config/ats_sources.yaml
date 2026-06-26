@@ -1,0 +1,21 @@
+﻿{
+  "settings": {
+    "enabled": true,
+    "include_greenhouse": true,
+    "include_lever": true,
+    "include_ashby": true,
+    "include_company_pages": true
+  },
+  "greenhouse": [],
+  "lever": [],
+  "ashby": [],
+  "company_pages": [
+    {
+      "company_name": "Example Analytics Co",
+      "careers_url": "https://example.com/careers",
+      "adapter_type": "manual_url",
+      "country_focus": ["Example Country"],
+      "tags": ["example", "data", "operations"]
+    }
+  ]
+}

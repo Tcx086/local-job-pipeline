@@ -1,0 +1,12 @@
+﻿# Example only. Replace with your real technical support evidence before using.
+profile_name: technical_support
+summary_options:
+  - "Technical support candidate comfortable troubleshooting user issues and documenting repeatable fixes."
+skills:
+  - Troubleshooting
+  - API basics
+  - Documentation
+  - Customer communication
+projects:
+  - name: Example Support Triage Project
+    description: "Created a sample issue triage checklist for common support cases."

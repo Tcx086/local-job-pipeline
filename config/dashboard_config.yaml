@@ -1,0 +1,4 @@
+﻿{
+  "statuses": ["new", "reviewed", "apply_today", "applied", "interview", "rejected", "archived", "skipped"],
+  "country_priority": ["Remote"]
+}

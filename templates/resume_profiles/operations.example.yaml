@@ -1,0 +1,12 @@
+﻿# Example only. Replace with your real operations evidence before using.
+profile_name: operations
+summary_options:
+  - "Operations candidate focused on execution, documentation, and clear follow-through."
+skills:
+  - Operations coordination
+  - Reporting
+  - Documentation
+  - Excel
+projects:
+  - name: Example Operations Checklist
+    description: "Created a sample checklist for a recurring operations review."

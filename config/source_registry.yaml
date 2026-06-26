@@ -1,0 +1,44 @@
+sources:
+  jobspy:
+    enabled: true
+    platforms:
+      - linkedin
+      - indeed
+      - google
+      - glassdoor
+      - zip_recruiter
+    notes: "Broad external job boards."
+  greenhouse:
+    enabled: true
+    type: ats_public_api
+  lever:
+    enabled: true
+    type: ats_public_api
+  ashby:
+    enabled: true
+    type: ats_public_api
+  crypto_job_boards:
+    enabled: true
+    sources:
+      - name: "CryptoJobsList"
+        mode: "rss_or_public_page"
+      - name: "Web3 Career"
+        mode: "public_page_or_manual"
+      - name: "Remote3"
+        mode: "public_page_or_manual"
+  finance_job_boards:
+    enabled: true
+    sources:
+      - name: "eFinancialCareers"
+        mode: "manual_search_url"
+      - name: "CFA Institute Career Center"
+        mode: "manual_search_url"
+  regional_job_boards:
+    enabled: true
+    sources:
+      - name: "Canada Job Bank"
+        mode: "manual_search_url_or_public"
+      - name: "JobsDB Hong Kong"
+        mode: "manual_search_url"
+      - name: "MyCareersFuture Singapore"
+        mode: "manual_search_url"

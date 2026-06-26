@@ -1,0 +1,34 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+.coverage
+htmlcov/
+
+# Local environment and user config
+.env
+config/search_scope.yaml
+config/application_campaign.local.yaml
+config/apply_profile.local.yaml
+config/resume_profile_paths.local.yaml
+config/scoring_rules.local.yaml
+templates/master_resume.yaml
+templates/resume_profiles/*.local.yaml
+
+# Local runtime artifacts
+data/**
+!data/
+!data/**/
+!data/**/.gitkeep
+
+
+# Generated/private artifacts
+*.docx
+*.pdf
+*.sqlite
+*.xlsx
+*.csv
+*.zip
+
+# Local scratch files
+.codex_tmp/

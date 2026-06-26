@@ -1,0 +1,51 @@
+modes:
+  strict:
+    days_back: 7
+    min_score_report: 70
+    generate_resume_min_score: 70
+    results_wanted_per_query: 20
+    include_maybe: false
+    hard_skip_only: true
+    max_queries_per_country: 80
+    manual_url_query_limit: 12
+  normal:
+    days_back: 30
+    min_score_report: 35
+    generate_resume_min_score: 65
+    results_wanted_per_query: 50
+    include_maybe: true
+    hard_skip_only: true
+    max_queries_per_country: 140
+    manual_url_query_limit: 20
+  broad:
+    days_back: 60
+    min_score_report: 25
+    generate_resume_min_score: 70
+    results_wanted_per_query: 100
+    include_maybe: true
+    hard_skip_only: false
+    max_queries_per_country: 260
+    manual_url_query_limit: 35
+  backfill:
+    days_back: 90
+    min_score_report: 0
+    generate_resume_min_score: 75
+    results_wanted_per_query: 100
+    include_maybe: true
+    hard_skip_only: false
+    max_queries_per_country: 320
+    manual_url_query_limit: 40
+
+reporting:
+  always_include_top_n: 20
+  dashboard_default_min_score: 35
+  markdown_min_score: 35
+  resume_generation_min_score: use mode config
+
+rotation:
+  enabled: true
+  daily_query_location_pairs:
+    normal: 80
+    broad: 120
+    backfill: 160
+  strategy: stable_hash_by_date

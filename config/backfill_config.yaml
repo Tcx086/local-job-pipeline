@@ -1,0 +1,11 @@
+defaults:
+  days_back: 30
+  mode: broad
+  mark_missing: false
+  report_active_only: true
+allowed_days_back:
+  - 7
+  - 14
+  - 30
+  - 60
+  - 90

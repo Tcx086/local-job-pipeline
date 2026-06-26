@@ -1,0 +1,12 @@
+﻿# Example only. Copy to a .local.yaml file or edit templates/master_resume.yaml with your real experience.
+profile_name: general_data
+summary_options:
+  - "Data-focused candidate with experience in reporting, spreadsheet analysis, and operational problem solving."
+skills:
+  - Excel
+  - SQL
+  - Python
+  - Reporting
+projects:
+  - name: Example Data Cleaning Project
+    description: "Cleaned and validated a sample dataset for reporting accuracy."

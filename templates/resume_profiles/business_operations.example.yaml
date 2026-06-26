@@ -1,0 +1,12 @@
+﻿# Example only. Replace with your real business operations evidence before using.
+profile_name: business_operations
+summary_options:
+  - "Operations-focused candidate with experience documenting workflows and improving recurring processes."
+skills:
+  - Process mapping
+  - Excel
+  - Reporting
+  - Stakeholder coordination
+projects:
+  - name: Example Workflow Review
+    description: "Mapped a sample intake workflow and identified handoff risks."

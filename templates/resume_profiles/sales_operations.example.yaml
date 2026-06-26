@@ -1,0 +1,12 @@
+﻿# Example only. Replace with your real sales or revenue operations evidence before using.
+profile_name: sales_operations
+summary_options:
+  - "Revenue operations candidate familiar with pipeline tracking, spreadsheet reporting, and CRM hygiene."
+skills:
+  - CRM reporting
+  - Excel
+  - Pipeline analysis
+  - Data quality
+projects:
+  - name: Example Pipeline Cleanup
+    description: "Standardized a sample pipeline export for easier review."

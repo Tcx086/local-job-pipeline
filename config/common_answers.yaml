@@ -1,0 +1,15 @@
+﻿questions:
+  why_company:
+    template: "I am interested in this organization because the role appears to connect practical problem solving, reliable execution, and measurable team impact. Before submitting, add one concrete reason based on the company and role."
+  why_role:
+    template: "This role aligns with my interest in using data, documentation, and operational judgment to improve day-to-day workflows. Before submitting, tailor this answer with only your real experience."
+  tell_me_about_yourself:
+    template: "TODO: Write a short, accurate summary of your background using only real experience, education, projects, and skills."
+  work_authorization_default:
+    template: "TODO: Review the application's work authorization question and answer accurately for your situation."
+  salary_expectation:
+    template: "I am open to discussing compensation based on the role, level, location, and overall package."
+  relocation:
+    template: "TODO: State your accurate relocation preference for this role."
+  availability:
+    template: "TODO: State your accurate availability or notice period."

@@ -1,0 +1,25 @@
+﻿profiles:
+  general_data:
+    source: "templates/resume_profiles/general_data.example.yaml"
+    docx: "data/resumes/profiles/general_data.docx"
+    pdf: "data/resumes/profiles/general_data.pdf"
+  business_operations:
+    source: "templates/resume_profiles/business_operations.example.yaml"
+    docx: "data/resumes/profiles/business_operations.docx"
+    pdf: "data/resumes/profiles/business_operations.pdf"
+  sales_operations:
+    source: "templates/resume_profiles/sales_operations.example.yaml"
+    docx: "data/resumes/profiles/sales_operations.docx"
+    pdf: "data/resumes/profiles/sales_operations.pdf"
+  technical_support:
+    source: "templates/resume_profiles/technical_support.example.yaml"
+    docx: "data/resumes/profiles/technical_support.docx"
+    pdf: "data/resumes/profiles/technical_support.pdf"
+  finance_operations:
+    source: "templates/resume_profiles/finance_operations.example.yaml"
+    docx: "data/resumes/profiles/finance_operations.docx"
+    pdf: "data/resumes/profiles/finance_operations.pdf"
+  operations:
+    source: "templates/resume_profiles/operations.example.yaml"
+    docx: "data/resumes/profiles/operations.docx"
+    pdf: "data/resumes/profiles/operations.pdf"
