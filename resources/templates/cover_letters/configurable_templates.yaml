@@ -1,0 +1,296 @@
+schema_version: 1
+
+global_rules:
+  default_greeting: "Dear Hiring Team,"
+  default_signoff: "Sincerely,"
+  manual_review_required: true
+  max_full_letter_words: 280
+  max_short_intro_words: 90
+  tone:
+    - "professional"
+    - "concise"
+    - "early-career but confident"
+    - "specific without sounding overqualified"
+    - "plain English, not overly polished AI prose"
+  non_core_skill_labels:
+    - "English"
+    - "Mandarin"
+    - "Mandarin Chinese"
+    - "Chinese"
+    - "Cantonese"
+    - "Spanish"
+  always_include_todos:
+    - "Review all facts before submitting."
+    - "Add one company-specific reason if the job description does not provide enough company context."
+    - "Confirm the final resume and cover letter match the exact application."
+  never_claim:
+    - "Canadian permanent residency"
+    - "citizenship"
+    - "employer sponsorship not required unless explicitly stored in a safe application-answer field"
+    - "CFA"
+    - "FRM"
+    - "CPA"
+    - "master's degree"
+    - "years of professional experience not present in the resume source"
+    - "team leadership"
+    - "managed direct reports"
+    - "revenue growth"
+    - "cost savings"
+    - "production trading ownership"
+    - "investment recommendations"
+    - "regulated financial advice"
+    - "company-specific product knowledge not present in the JD"
+  sensitive_exclusions:
+    - "passport"
+    - "government ID"
+    - "SIN"
+    - "SSN"
+    - "bank account"
+    - "banking info"
+    - "financial account"
+    - "exact date of birth"
+    - "health data"
+    - "medical record"
+    - "medical condition"
+    - "work authorization"
+    - "sponsorship"
+    - "visa sponsorship"
+    - "employer sponsorship"
+    - "disability"
+    - "veteran"
+    - "race"
+    - "ethnicity"
+    - "gender"
+    - "EEO"
+  weak_match_language:
+    direct: "My background includes {evidence_phrase}."
+    adjacent: "My background is adjacent to this through {evidence_phrase}, and I would bring a careful, structured learning approach to the parts of the role that are newer to me."
+    coursework: "I have coursework exposure to {keyword_phrase}, but I would not present it as professional experience."
+    missing: "Do not claim this keyword. Keep it in missing_keywords_not_claimed."
+
+company_reason_policy:
+  if_jd_has_company_context: "Use one concrete reason from the job description only."
+  if_no_company_context: "Use TODO instead of inventing company praise."
+  todo_text: "TODO: Add one specific reason for this company after reviewing the company website or posting."
+  generic_slogan_phrases:
+    - "operating at the highest level"
+    - "we are a global leader"
+    - "join our team"
+    - "we are proud to"
+
+templates:
+  full_deep_tailor:
+    enabled_for_efforts:
+      - deep_tailor
+    target_words: 230
+    paragraphs:
+      - "I am writing to express my interest in the {title} role at {company}. The position stood out to me because it connects {jd_focus_phrase} with the type of {positioning_phrase} work I have been building toward. {company_reason_sentence}"
+      - "My strongest fit is in {matched_skill_phrase}. {evidence_sentence_1}. {evidence_sentence_2}. These experiences have helped me become comfortable turning ambiguous requirements into structured analysis, clean documentation, and practical outputs."
+      - "I would be excited to bring structured analysis, reliable execution, and careful communication to {company}. I understand that some areas of the role may require continued learning, and I would approach them with accuracy, transparency, and a strong bias toward reliable work."
+    closing: "Thank you for your time and consideration. I would welcome the opportunity to discuss how my background could support the team."
+
+  full_standard_tailor:
+    enabled_for_efforts:
+      - standard_tailor
+    target_words: 210
+    paragraphs:
+      - "I am interested in the {title} role at {company} because it aligns with my background in {matched_skill_phrase} and my interest in {positioning_phrase}. {company_reason_sentence}"
+      - "Through my projects and experience, {evidence_sentence_1}. I would also bring experience with {skill_list_sentence}, which I would apply carefully to the responsibilities described in this role."
+      - "I would bring a structured, detail-oriented approach to the team, especially in areas involving reporting, data quality, workflow execution, and communication across business and technical requirements."
+    closing: "Thank you for considering my application. I would appreciate the opportunity to speak further."
+
+  short_intro:
+    enabled_for_efforts:
+      - deep_tailor
+      - standard_tailor
+    target_words: 80
+    text: "I am interested in the {title} role at {company}. My background combines {matched_skill_phrase} with hands-on experience where {evidence_short_phrase}. I am especially interested in roles involving {jd_focus_phrase}. I would be glad to discuss how my background could fit the team."
+
+  recruiter_message:
+    enabled_for_efforts:
+      - deep_tailor
+      - standard_tailor
+    target_words: 90
+    text: "Hi {recruiter_name_or_team}, I came across the {title} role at {company} and wanted to reach out. My background includes {matched_skill_phrase}, with experience where {evidence_short_phrase}. I recently applied / am planning to apply and would appreciate the chance to be considered. Thank you."
+
+  follow_up_message:
+    enabled_for_efforts:
+      - deep_tailor
+      - standard_tailor
+    target_words: 75
+    text: "Hi {recruiter_name_or_team}, I wanted to briefly follow up on my application for the {title} role at {company}. I remain very interested because the role aligns with my background in {matched_skill_phrase} and my interest in {positioning_phrase}. Thank you again for your time."
+
+profile_overlays:
+  data_market_data:
+    positioning: "financial data, market data, reporting, and workflow automation"
+    jd_focus_fallback: "data quality, reporting, and decision-support workflows"
+    preferred_evidence:
+      - "Python-based data workflow"
+      - "SQL or structured data analysis"
+      - "market data or trading data project"
+      - "dashboard/reporting output"
+    safe_skill_groups:
+      - "Python"
+      - "SQL"
+      - "Excel"
+      - "pandas"
+      - "market data"
+      - "reporting"
+      - "data quality"
+    avoid_overclaim:
+      - "production data engineering ownership"
+      - "institutional market data vendor expertise"
+
+  risk_operations:
+    positioning: "risk operations, controls, reconciliation, and structured reporting"
+    jd_focus_fallback: "risk controls, reporting accuracy, and operational follow-through"
+    preferred_evidence:
+      - "risk-control logic"
+      - "backtesting or validation workflow"
+      - "data quality checks"
+      - "structured reporting"
+    safe_skill_groups:
+      - "Excel"
+      - "SQL"
+      - "Python"
+      - "risk controls"
+      - "reporting"
+      - "reconciliation"
+      - "data validation"
+    avoid_overclaim:
+      - "professional credit underwriting"
+      - "regulated risk sign-off authority"
+      - "model risk ownership"
+
+  trading_operations:
+    positioning: "trading operations, market data, exchange workflows, and reconciliation"
+    jd_focus_fallback: "market operations, data monitoring, and trade-support workflows"
+    preferred_evidence:
+      - "exchange API project"
+      - "order book or market data workflow"
+      - "reconciliation-style checks"
+      - "operational monitoring"
+    safe_skill_groups:
+      - "market data"
+      - "exchange APIs"
+      - "Python"
+      - "SQL"
+      - "reconciliation"
+      - "reporting"
+      - "operational controls"
+    avoid_overclaim:
+      - "professional trader"
+      - "execution trader"
+      - "investment advice"
+      - "production trading system ownership"
+
+  api_technical_operations:
+    positioning: "API support, technical operations, troubleshooting, and client-facing workflow support"
+    jd_focus_fallback: "technical troubleshooting, API workflows, and structured support"
+    preferred_evidence:
+      - "REST API or exchange API work"
+      - "JSON/data pipeline handling"
+      - "debugging or workflow automation"
+      - "documentation or communication"
+    safe_skill_groups:
+      - "REST API"
+      - "JSON"
+      - "Python"
+      - "SQL"
+      - "technical troubleshooting"
+      - "documentation"
+      - "client communication"
+    avoid_overclaim:
+      - "senior backend engineering"
+      - "production SRE ownership"
+      - "enterprise implementation ownership"
+
+  capital_markets_business:
+    positioning: "capital markets, business analysis, financial operations, and reporting"
+    jd_focus_fallback: "financial analysis, reporting, stakeholder communication, and operational execution"
+    preferred_evidence:
+      - "financial market analysis"
+      - "Excel/reporting workflow"
+      - "requirements-to-output project"
+      - "business or client communication"
+    safe_skill_groups:
+      - "Excel"
+      - "SQL"
+      - "Python"
+      - "capital markets"
+      - "financial analysis"
+      - "reporting"
+      - "business analysis"
+    avoid_overclaim:
+      - "investment banking transaction experience"
+      - "licensed advisory work"
+      - "deal execution ownership"
+
+role_family_overlays:
+  quality_assurance:
+    positioning: "quality assurance, process documentation, data quality checks, and operational follow-through"
+    jd_focus_fallback: "quality documentation, process checks, data accuracy, and continuous improvement"
+    preferred_evidence:
+      - "data quality checks"
+      - "documentation workflow"
+      - "process tracking"
+      - "structured Excel tracking"
+      - "operational follow-up"
+    safe_skill_groups:
+      - "Excel"
+      - "documentation"
+      - "data quality"
+      - "process tracking"
+      - "reporting"
+      - "communication"
+    avoid_overclaim:
+      - "aerospace quality certification"
+      - "Six Sigma certification"
+      - "ISO audit ownership"
+      - "manufacturing QA ownership"
+
+  client_finance:
+    positioning: "client finance, budget tracking, project financial reporting, and operational analysis"
+    jd_focus_fallback: "budget monitoring, variance analysis, billing support, and project financial controls"
+    preferred_evidence:
+      - "Excel/reporting workflow"
+      - "financial analysis"
+      - "data cleaning or reconciliation"
+      - "client-facing communication"
+    safe_skill_groups:
+      - "Excel"
+      - "reporting"
+      - "budget tracking"
+      - "variance analysis"
+      - "data analysis"
+      - "communication"
+    avoid_overclaim:
+      - "revenue recognition ownership"
+      - "full-cycle accounting ownership"
+      - "CPA-level accounting expertise"
+
+  revenue_operations:
+    positioning: "revenue operations, reporting, process improvement, and cross-functional business analysis"
+    jd_focus_fallback: "sales/revenue reporting, workflow improvement, and operational data quality"
+    preferred_evidence:
+      - "dashboard/reporting workflow"
+      - "data analysis"
+      - "business process tracking"
+      - "client or stakeholder communication"
+    safe_skill_groups:
+      - "Excel"
+      - "SQL"
+      - "Python"
+      - "CRM/reporting"
+      - "workflow automation"
+      - "business analysis"
+    avoid_overclaim:
+      - "owning revenue strategy"
+      - "quota-carrying sales leadership"
+      - "enterprise RevOps administration ownership"
+
+fallback:
+  positioning: "finance, data analysis, operations, and structured problem-solving"
+  jd_focus_fallback: "data-driven decision-making, reporting, and operational execution"
+  evidence_sentence_if_sparse: "worked on structured analytical projects that required data cleaning, logic checks, and clear presentation of results"
+  skill_sentence_if_sparse: "Excel, Python, SQL, reporting, and communication"

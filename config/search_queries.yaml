@@ -1,0 +1,67 @@
+{
+  "settings": {
+    "hours_old": 24,
+    "results_wanted": 10,
+    "sleep_seconds": 4,
+    "verbose": 1,
+    "linkedin_fetch_description": false,
+    "site_name": ["indeed", "linkedin", "google", "glassdoor", "zip_recruiter"]
+  },
+  "countries": {
+    "Canada": {
+      "locations": [
+        "Toronto, ON",
+        "Mississauga, ON",
+        "Waterloo, ON",
+        "Montreal, QC",
+        "Vancouver, BC",
+        "Calgary, AB",
+        "Remote Canada"
+      ],
+      "search_terms": [
+        "Trading Operations Analyst",
+        "Market Data Analyst",
+        "Risk Analyst",
+        "Data Analyst fintech",
+        "Capital Markets Analyst",
+        "Business Analyst capital markets",
+        "Technical Operations Analyst fintech",
+        "API Integration Analyst fintech",
+        "Junior Data Engineer finance",
+        "Investment Data Analyst",
+        "Credit Risk Analyst",
+        "Treasury Analyst"
+      ]
+    },
+    "Singapore": {
+      "locations": ["Singapore"],
+      "search_terms": [
+        "Trading Operations Analyst",
+        "Market Data Analyst",
+        "Crypto Data Analyst",
+        "Exchange Operations Analyst",
+        "Risk Operations Analyst",
+        "API Integration Analyst",
+        "Technical Operations Analyst",
+        "FinTech Data Analyst",
+        "Junior Data Engineer finance",
+        "Digital Assets Analyst"
+      ]
+    },
+    "Hong Kong": {
+      "locations": ["Hong Kong"],
+      "search_terms": [
+        "Trading Operations Analyst",
+        "Market Data Analyst",
+        "Crypto Operations Analyst",
+        "Capital Markets Analyst",
+        "Risk Analyst",
+        "Data Analyst finance",
+        "API Support Analyst",
+        "Technical Operations Analyst",
+        "Securities Operations Analyst",
+        "Trade Support Analyst"
+      ]
+    }
+  }
+}

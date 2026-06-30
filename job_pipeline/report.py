@@ -21,13 +21,13 @@ from .utils import REPORTS_DIR, list_to_cell, today_yyyymmdd, write_csv
 REPORT_FIELDS = [
     "canonical_job_id", "score", "score_band", "recommendation", "freshness_label", "is_new_since_last_run",
     "title", "company", "location", "country", "source", "search_term_used", "posted_at", "first_seen_at", "last_seen_at",
-    "is_active", "job_url", "apply_url", "role_category", "seniority", "matched_keywords",
+    "is_active", "job_url", "apply_url", "role_category", "role_family", "fit_category", "seniority", "matched_keywords",
     "missing_keywords", "red_flags", "hard_skip", "soft_penalties", "filter_reason", "all_sources",
     "reason_to_apply", "scheduler_resume_draft_path", "resume_file_generated", "status", "next_action",
 ]
 
 FRESHNESS_PRIORITY = {"new_today": 0, "new_this_week": 1, "recent": 2, "unknown": 3, "old": 4}
-COUNTRY_PRIORITY = {"Remote": 99}
+COUNTRY_PRIORITY = {"Canada": 0, "Singapore": 1, "Hong Kong": 2, "Remote": 3}
 
 
 def _status(job: dict[str, Any]) -> str:
@@ -70,6 +70,8 @@ def prepare_report_rows(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "job_url": job.get("job_url"),
             "apply_url": job.get("apply_url"),
             "role_category": job.get("role_category"),
+            "role_family": job.get("role_family"),
+            "fit_category": job.get("fit_category"),
             "seniority": job.get("seniority"),
             "matched_keywords": list_to_cell(job.get("matched_keywords")),
             "missing_keywords": list_to_cell(job.get("missing_keywords")),
@@ -125,6 +127,21 @@ def _top_review_candidates(rows: list[dict[str, Any]], top_n: int) -> list[dict[
     return sorted([row for row in rows if not _hard_skip(row)], key=lambda row: _score(row), reverse=True)[:top_n]
 
 
+
+def _summary_by_field(rows: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = str(row.get(field) or "unknown")
+        bucket = buckets.setdefault(key, {field: key, "all_jobs": 0, "actionable_jobs": 0, "hard_skipped": 0, "avg_score": 0})
+        bucket["all_jobs"] += 1
+        bucket["avg_score"] += _score(row)
+        if _hard_skip(row):
+            bucket["hard_skipped"] += 1
+        elif _score(row) >= 35:
+            bucket["actionable_jobs"] += 1
+    for bucket in buckets.values():
+        bucket["avg_score"] = round(bucket["avg_score"] / max(1, bucket["all_jobs"]), 1)
+    return sorted(buckets.values(), key=lambda item: (-int(item["actionable_jobs"]), -int(item["all_jobs"]), str(item.get(field) or "")))
 def _sheet_rows(rows: list[dict[str, Any]], db_path: Path, min_score_report: int, top_n: int) -> list[tuple[str, list[dict[str, Any]], list[str] | None]]:
     return [
         ("Top Review Candidates", _top_review_candidates(rows, top_n), REPORT_FIELDS),
@@ -136,11 +153,15 @@ def _sheet_rows(rows: list[dict[str, Any]], db_path: Path, min_score_report: int
         ("Skip 0-24", [r for r in rows if not _hard_skip(r) and _score(r) < 25], REPORT_FIELDS),
         ("Visible Score Threshold", [r for r in rows if not _hard_skip(r) and _score(r) >= min_score_report], REPORT_FIELDS),
         ("All Jobs", rows, REPORT_FIELDS),
+        ("By Role Family", _summary_by_field(rows, "role_family"), None),
+        ("By Fit Category", _summary_by_field(rows, "fit_category"), None),
         ("Hard Skipped", [r for r in rows if _hard_skip(r)], REPORT_FIELDS),
         ("New Today", [r for r in rows if r.get("freshness_label") == "new_today" or int(r.get("is_new_since_last_run") or 0) == 1], REPORT_FIELDS),
         ("New This Week", [r for r in rows if _new_this_week(r)], REPORT_FIELDS),
         ("Backfill Active Jobs", [r for r in rows if _active_old(r)], REPORT_FIELDS),
-        *[(country, [r for r in rows if r.get("country") == country], REPORT_FIELDS) for country in sorted({str(r.get("country") or "Unknown") for r in rows})],
+        ("Canada", [r for r in rows if r.get("country") == "Canada"], REPORT_FIELDS),
+        ("Singapore", [r for r in rows if r.get("country") == "Singapore"], REPORT_FIELDS),
+        ("Hong Kong", [r for r in rows if r.get("country") == "Hong Kong"], REPORT_FIELDS),
         ("Search Coverage", get_search_coverage_rows(db_path), None),
         ("Source Health", get_source_health_rows(db_path), None),
         ("Dedupe Audit", get_job_merge_events(db_path), None),
@@ -169,7 +190,7 @@ def _append_job(lines: list[str], idx: int, row: dict[str, Any]) -> None:
     lines.append(f"- Band: {_band(row)} | Recommendation: {row.get('recommendation')} | Freshness: {row.get('freshness_label')}")
     lines.append(f"- Location: {row.get('location')} | {row.get('country')} | Source: {row.get('source')}")
     lines.append(f"- Posted: {row.get('posted_at') or 'unknown'} | First seen: {row.get('first_seen_at') or 'unknown'}")
-    lines.append(f"- Role category: {row.get('role_category')}")
+    lines.append(f"- Role category: {row.get('role_category')} | Family: {row.get('role_family') or 'unknown'} | Fit: {row.get('fit_category') or 'unknown'}")
     lines.append(f"- Matched keywords: {row.get('matched_keywords')}")
     if row.get("missing_keywords"):
         lines.append(f"- Missing keywords to review: {row.get('missing_keywords')}")
@@ -206,6 +227,10 @@ def write_top_jobs_markdown(path: Path, rows: list[dict[str, Any]], *, limit: in
     lines.append(f"- Low priority 25-34: {sum(1 for row in non_hard if 25 <= _score(row) < 35)}")
     lines.append(f"- Skip 0-24: {sum(1 for row in non_hard if _score(row) < 25)}")
     lines.append(f"- Hard Skipped: {len(hard_skipped)}")
+    family_summary = _summary_by_field(rows, "role_family")
+    fit_summary = _summary_by_field(rows, "fit_category")
+    lines.append("- Top actionable role families: " + (", ".join(f"{item['role_family']} ({item['actionable_jobs']})" for item in family_summary[:5] if int(item.get("actionable_jobs") or 0)) or "none"))
+    lines.append("- Fit categories: " + (", ".join(f"{item['fit_category']} ({item['actionable_jobs']})" for item in fit_summary if int(item.get("actionable_jobs") or 0)) or "none"))
     lines.append(f"- Visible report threshold: {min_score_report}")
     if not apply_grade and top_review:
         lines.append("- No apply-grade roles, but review candidates exist.")

@@ -1,21 +1,52 @@
-﻿{
+{
   "settings": {
-    "enabled": true,
-    "include_greenhouse": true,
-    "include_lever": true,
-    "include_ashby": true,
-    "include_company_pages": true
+    "timeout_seconds": 20,
+    "max_retries": 1,
+    "sleep_seconds": 1.5,
+    "user_agent": "job-pipeline-local/2.0 (+manual application workflow; public job postings only)"
   },
-  "greenhouse": [],
-  "lever": [],
-  "ashby": [],
-  "company_pages": [
+  "greenhouse": [
     {
-      "company_name": "Example Analytics Co",
-      "careers_url": "https://example.com/careers",
-      "adapter_type": "manual_url",
-      "country_focus": ["Example Country"],
-      "tags": ["example", "data", "operations"]
+      "company_name": "Coinbase",
+      "board_token": "coinbase",
+      "country_focus": ["Canada", "Singapore", "Hong Kong"],
+      "tags": ["crypto", "fintech", "data", "operations"]
     }
+  ],
+  "lever": [
+    {
+      "company_name": "Super.com",
+      "lever_slug": "super",
+      "country_focus": ["Canada"],
+      "tags": ["fintech", "data", "operations"],
+      "notes": "Public Lever board used as a collector smoke-test source."
+    }
+  ],
+  "ashby": [
+    {
+      "company_name": "Linear",
+      "ashby_board": "linear",
+      "country_focus": ["Canada", "Singapore", "Hong Kong"],
+      "tags": ["software", "data", "ops"],
+      "notes": "Public Ashby board used as a collector smoke-test source."
+    }
+  ],
+  "company_pages": [
+    {"company_name": "Wealthsimple", "careers_url": "https://www.wealthsimple.com/en-ca/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["fintech", "data", "operations"]},
+    {"company_name": "Chainalysis", "careers_url": "https://www.chainalysis.com/careers/", "adapter_type": "manual_url", "country_focus": ["Canada", "Singapore"], "tags": ["crypto", "data", "risk"]},
+    {"company_name": "Stripe", "careers_url": "https://stripe.com/jobs", "adapter_type": "manual_url", "country_focus": ["Canada", "Singapore"], "tags": ["fintech", "api"]},
+    {"company_name": "RBC", "careers_url": "https://jobs.rbc.com/ca/en", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "TD", "careers_url": "https://jobs.td.com/en-CA/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "BMO", "careers_url": "https://jobs.bmo.com/ca/en", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "CIBC", "careers_url": "https://cibc.wd3.myworkdayjobs.com/search", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "Scotiabank", "careers_url": "https://jobs.scotiabank.com/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "National Bank", "careers_url": "https://jobs.nbc.ca/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
+    {"company_name": "Manulife", "careers_url": "https://manulife.wd3.myworkdayjobs.com/MFCJH_Jobs", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["insurance", "risk", "data"]},
+    {"company_name": "Sun Life", "careers_url": "https://sunlife.wd3.myworkdayjobs.com/Experienced-Jobs", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["insurance", "risk", "data"]},
+    {"company_name": "TMX Group", "careers_url": "https://www.tmx.com/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["exchange", "capital_markets", "market_data"]},
+    {"company_name": "HKEX", "careers_url": "https://www.hkexgroup.com/Careers", "adapter_type": "manual_url", "country_focus": ["Hong Kong"], "tags": ["exchange", "capital_markets", "market_data"]},
+    {"company_name": "DBS", "careers_url": "https://www.dbs.com/careers/", "adapter_type": "manual_url", "country_focus": ["Singapore"], "tags": ["bank", "risk", "data"]},
+    {"company_name": "OCBC", "careers_url": "https://www.ocbc.com/group/careers/", "adapter_type": "manual_url", "country_focus": ["Singapore"], "tags": ["bank", "risk", "data"]},
+    {"company_name": "UOB", "careers_url": "https://www.uobgroup.com/careers/", "adapter_type": "manual_url", "country_focus": ["Singapore"], "tags": ["bank", "risk", "data"]}
   ]
 }

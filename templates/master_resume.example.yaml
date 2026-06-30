@@ -1,55 +1,34 @@
-﻿# Copy to templates/master_resume.yaml and replace every placeholder with your real experience.
-# The generator must not invent employers, dates, degrees, or achievements.
-name: "Your Name"
-location: "City, Region"
-headline: "Data and operations candidate"
+name: "Candidate Name"
+headline: "Early-career analyst candidate"
+location: "City, Country"
 contacts:
-  email: "you@example.com"
+  email: "candidate@example.com"
   phone: ""
   linkedin: ""
-
 summary:
-  - "Data-focused candidate with experience in reporting, spreadsheet analysis, and operational problem solving."
-  - "Comfortable turning messy information into clear summaries, checklists, and dashboards."
-
+  - "Example candidate summary for public documentation only. Replace with your own local facts before use."
 skills:
-  programming_data:
-    - Excel
-    - SQL
-    - Python
-    - Reporting
-  workflow_tools:
-    - Documentation
-    - Spreadsheet modeling
-    - Process tracking
-  operations:
-    - Data validation
-    - Reconciliation
-    - Stakeholder communication
-
+  technical:
+    - "Python"
+    - "SQL"
+    - "Spreadsheet analysis"
 projects:
-  - name: Example Data Cleaning Project
-    type: Personal project
-    dates: "YYYY"
+  - name: "Example Data Analysis Project"
+    type: "Example Project"
+    dates: "Example Year"
     bullets:
-      - "Cleaned and validated a sample dataset for reporting accuracy."
-      - "Built a simple dashboard from placeholder data."
-
+      - "Built a small local analysis workflow using Python and spreadsheet data."
+      - "Created summary tables and simple charts to support review."
 experience:
-  - title: Example Operations Assistant
-    company: Example Company
-    location: Example City
-    dates: "YYYY-YYYY"
+  - title: "Example Role"
+    company: "Example Company"
+    location: "City, Country"
+    dates: "Example Dates"
     bullets:
-      - "Replace this with a real, evidence-backed achievement."
-      - "Use numbers only when they are true and verifiable."
-
+      - "Supported example reporting, documentation, and data quality checks."
 education:
-  - degree: Example Degree
-    school: Example School
-    date: "YYYY"
-    details:
-      - "Relevant coursework or training, if accurate."
-
+  - degree: "Example Degree"
+    school: "Example University"
+    date: "Example Year"
 languages:
-  - English
+  - "English"

@@ -29,9 +29,7 @@ hard_skip_rules:
   - id: senior_8_plus
     pattern: "\\b(senior|sr\\.?|staff|principal|lead|manager|director)\\b[^.]{0,160}\\b(8\\+|9\\+|10\\+|8|9|10|eight|nine|ten)\\s*(years|yrs)\\b"
     reason: "Senior/manager role with 8+ years requirement."
-  - id: non_target_life_sciences_research
-    pattern: "\\b(biotech|biopharma|life sciences?|proteomics?|proteome|protein data|drug discovery|therapeutic development|clinical research|medical research|genomics?|molecular biology|laboratory|bioinformatics)\\b"
-    reason: "Life sciences/biotech research industry mismatch."
+
 soft_penalty_rules:
   - id: senior_title
     pattern: "\\b(senior|sr\\.?|staff|principal|lead)\\b"

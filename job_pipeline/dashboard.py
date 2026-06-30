@@ -17,16 +17,15 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from job_pipeline.application_answers import answer_pack_paths, generate_answer_pack, load_answer_pack
-from job_pipeline.config_loader import public_config_status
+from job_pipeline.cover_letter import cover_letter_generation_enabled, cover_letter_paths, generate_cover_letter, load_cover_letter
 from job_pipeline.campaign import build_daily_campaign, load_resume_profile_paths, profile_resume_exists, profile_resume_path, profile_resume_source_path
-from job_pipeline.browser_launcher import open_apply_url, open_company_careers_page, open_resume_file, read_local_text
+from job_pipeline.browser_launcher import open_application_folder, open_apply_url, open_company_careers_page, open_resume_file, read_local_text
 from job_pipeline import database as database_module
 from job_pipeline.database import DEFAULT_DB, get_campaign_items, get_companies, get_job_detail, get_jobs, get_latest_campaign_date, replace_campaign_items, save_campaign_items, update_application, update_campaign_item_files, update_campaign_item_status, upsert_jobs
 from job_pipeline.keyword_extract import extract_keywords
 from job_pipeline.profile_export import export_profile
 from job_pipeline.normalize import normalize_job
 from job_pipeline.query_expander import load_reporting_config
-from job_pipeline.search_scope import SearchScopeError, enabled_countries, load_search_scope
 from job_pipeline.resume_tailor import generate_profile_resumes, generate_resume
 from job_pipeline.score import score_job
 from job_pipeline.utils import CONFIG_DIR, flatten_text, load_yaml, now_utc_iso, today_yyyymmdd
@@ -53,7 +52,6 @@ get_job_merge_events = getattr(database_module, "get_job_merge_events", _empty_d
 
 DASHBOARD_TAB_LABELS = [
     "Overview",
-    "Setup / Search Scope",
     "Job Radar",
     "Application Tracker",
     "Company Tracker",
@@ -74,80 +72,9 @@ def _config() -> dict[str, Any]:
         return {}
 
 
-
-def setup_search_scope_page() -> None:
-    st.header("Setup / Search Scope")
-    status_rows = public_config_status()
-    st.subheader("Config Files")
-    _dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
-
-    try:
-        scope = load_search_scope()
-    except (RuntimeError, SearchScopeError, FileNotFoundError) as exc:
-        st.error(str(exc))
-        st.info("Run python -m job_pipeline.setup_wizard --init, then edit config/search_scope.yaml.")
-        return
-
-    search = scope.get("search") if isinstance(scope.get("search"), dict) else {}
-    st.subheader("Active Search Settings")
-    st.write(
-        {
-            "hours_old": search.get("hours_old"),
-            "results_wanted": search.get("results_wanted"),
-            "sleep_seconds": search.get("sleep_seconds"),
-            "mode": search.get("mode"),
-            "sites": search.get("sites") or [],
-        }
-    )
-
-    rows: list[dict[str, Any]] = []
-    for country, payload in enabled_countries(scope).items():
-        rows.append(
-            {
-                "country": country,
-                "locations": "; ".join(str(item) for item in payload.get("locations") or []),
-                "search_terms": "; ".join(str(item) for item in payload.get("search_terms") or []),
-            }
-        )
-    st.subheader("Enabled Countries")
-    _dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    st.info("Edit config/search_scope.yaml to change countries, locations, role keywords, job boards, and filters.")
-    st.warning("Do not store sensitive identity, government ID, demographic, health, or financial data in config files.")
-
-def _configured_country_options() -> list[str]:
-    try:
-        options = sorted(enabled_countries(load_search_scope()).keys())
-    except Exception:
-        options = []
-    for value in ["Remote", ""]:
-        if value not in options:
-            options.append(value)
-    return options
 def _jobs_df() -> pd.DataFrame:
     rows = get_jobs(DEFAULT_DB, include_inactive=True)
-    df = pd.DataFrame(rows)
-    if not df.empty and "is_new_since_last_run" in df.columns:
-        df["new_since_last_run"] = df["is_new_since_last_run"].fillna(0).astype(int).astype(bool)
-    return df
-
-
-def _latest_collection_summary() -> dict[str, Any]:
-    rows = get_source_health_rows(DEFAULT_DB)
-    if not rows:
-        return {}
-    latest_run = str(rows[0].get("run_id") or "")
-    latest_at = max(str(row.get("last_run_at") or "") for row in rows)
-    raw_count = sum(int(row.get("raw_count_last_run") or 0) for row in rows)
-    normalized_count = sum(int(row.get("normalized_count_last_run") or 0) for row in rows)
-    healthy_sources = sum(1 for row in rows if str(row.get("status") or "") == "healthy")
-    return {
-        "run_id": latest_run,
-        "last_run_at": latest_at,
-        "raw_count": raw_count,
-        "normalized_count": normalized_count,
-        "healthy_sources": healthy_sources,
-        "source_count": len(rows),
-    }
+    return pd.DataFrame(rows)
 
 
 def _safe_list(df: pd.DataFrame, column: str) -> list[str]:
@@ -156,10 +83,8 @@ def _safe_list(df: pd.DataFrame, column: str) -> list[str]:
     return sorted(str(v) for v in df[column].dropna().unique() if str(v))
 
 POST_APPLY_STATUSES = {"applied", "interview", "rejected"}
-CAMPAIGN_APPLICATION_BUCKETS = ["Actionable", "Not applied", "Applied", "Skipped", "All"]
-CAMPAIGN_NON_ACTION_STATUSES = {"skipped", "archived", "deferred"}
-CAMPAIGN_EFFORT_ORDER = {"deep_tailor": 0, "standard_tailor": 1, "quick_apply": 2, "hold": 3, "skip": 99}
-CAMPAIGN_STATUS_ORDER = {"queued": 0, "moved_to_hold": 1, "deferred": 2, "applied": 90, "skipped": 99, "archived": 99}
+SKIPPED_CAMPAIGN_STATUSES = {"skipped", "archived", "deferred"}
+CAMPAIGN_APPLICATION_BUCKETS = ["Actionable", "Skipped", "Not applied", "Applied", "All"]
 
 
 def _lower_text_series(df: pd.DataFrame, column: str) -> pd.Series:
@@ -172,6 +97,18 @@ def _nonempty_text_series(df: pd.DataFrame, column: str) -> pd.Series:
     if column not in df.columns:
         return pd.Series(False, index=df.index, dtype=bool)
     return df[column].fillna("").astype(str).str.strip() != ""
+
+
+def _int_display(value: Any) -> int:
+    try:
+        if pd.isna(value):
+            return 0
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _applied_jobs_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -191,26 +128,13 @@ def _campaign_applied_mask(df: pd.DataFrame) -> pd.Series:
     return (campaign_status == "applied") | application_status.isin(POST_APPLY_STATUSES) | applied_at
 
 
-def _bool_series(df: pd.DataFrame, column: str) -> pd.Series:
-    if column not in df.columns:
-        return pd.Series(False, index=df.index, dtype=bool)
-    return df[column].fillna(False).map(_truthy).astype(bool)
-
-
 def _campaign_skipped_mask(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(False, index=df.index, dtype=bool)
     campaign_status = _lower_text_series(df, "campaign_status")
     effort = _lower_text_series(df, "application_effort")
-    hard_skip = _bool_series(df, "hard_skip")
-    return campaign_status.isin(CAMPAIGN_NON_ACTION_STATUSES) | (effort == "skip") | hard_skip
-
-
-def _campaign_actionable_mask(df: pd.DataFrame) -> pd.Series:
-    if df.empty:
-        return pd.Series(False, index=df.index, dtype=bool)
-    campaign_status = _lower_text_series(df, "campaign_status")
-    return (campaign_status == "queued") & ~_campaign_applied_mask(df) & ~_campaign_skipped_mask(df)
+    hard_skip = df["hard_skip"].apply(_truthy) if "hard_skip" in df.columns else pd.Series(False, index=df.index, dtype=bool)
+    return campaign_status.isin(SKIPPED_CAMPAIGN_STATUSES) | (effort == "skip") | hard_skip
 
 
 def _campaign_df_with_application_bucket(df: pd.DataFrame) -> pd.DataFrame:
@@ -220,37 +144,22 @@ def _campaign_df_with_application_bucket(df: pd.DataFrame) -> pd.DataFrame:
         return output
     applied_mask = _campaign_applied_mask(output)
     skipped_mask = _campaign_skipped_mask(output)
-    actionable_mask = _campaign_actionable_mask(output)
+    queued_mask = _lower_text_series(output, "campaign_status") == "queued"
+    actionable_mask = queued_mask & ~applied_mask & ~skipped_mask
     output["application_bucket"] = "Not applied"
     output.loc[actionable_mask, "application_bucket"] = "Actionable"
-    output.loc[skipped_mask, "application_bucket"] = "Skipped"
+    output.loc[skipped_mask & ~applied_mask, "application_bucket"] = "Skipped"
     output.loc[applied_mask, "application_bucket"] = "Applied"
     return output
 
 
 def _filter_campaign_bucket(df: pd.DataFrame, bucket: str) -> pd.DataFrame:
     bucket_series = df.get("application_bucket", pd.Series("", index=df.index))
-    if bucket == "Actionable":
-        return df[bucket_series == "Actionable"].copy()
-    if bucket == "Applied":
-        return df[bucket_series == "Applied"].copy()
-    if bucket == "Skipped":
-        return df[bucket_series == "Skipped"].copy()
+    if bucket in {"Actionable", "Skipped", "Applied"}:
+        return df[bucket_series == bucket].copy()
     if bucket == "Not applied":
-        return df[bucket_series.isin(["Actionable", "Not applied"])].copy()
+        return df[~bucket_series.isin(["Applied", "Skipped"])].copy()
     return df.copy()
-
-
-def _sort_campaign_display(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty:
-        return df.copy()
-    output = df.copy()
-    output["_skip_sort"] = _campaign_skipped_mask(output).astype(int)
-    output["_effort_sort"] = _lower_text_series(output, "application_effort").map(CAMPAIGN_EFFORT_ORDER).fillna(50).astype(int)
-    output["_status_sort"] = _lower_text_series(output, "campaign_status").map(CAMPAIGN_STATUS_ORDER).fillna(50).astype(int)
-    output["_score_sort"] = -output.get("score", pd.Series(0, index=output.index)).fillna(0).astype(int)
-    output = output.sort_values(["_skip_sort", "_effort_sort", "_status_sort", "_score_sort", "company", "title"])
-    return output.drop(columns=["_skip_sort", "_effort_sort", "_status_sort", "_score_sort"])
 
 
 def _resolve_dashboard_path(path_text: Any) -> Path:
@@ -301,9 +210,15 @@ def _profile_resume_rows(profile_paths: dict[str, Any] | None = None) -> list[di
 
 
 def _tailored_resume_rows(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty or "tailored_resume_path" not in df.columns:
+    if df.empty:
         return pd.DataFrame()
-    tailored = df[df["tailored_resume_path"].fillna("").astype(str).str.strip() != ""].copy()
+    resume_columns = [column for column in ["resume_pdf_path", "tailored_resume_path"] if column in df.columns]
+    if not resume_columns:
+        return pd.DataFrame()
+    mask = pd.Series(False, index=df.index, dtype=bool)
+    for column in resume_columns:
+        mask = mask | (df[column].fillna("").astype(str).str.strip() != "")
+    tailored = df[mask].copy()
     if tailored.empty:
         return tailored
     if "campaign_date" in tailored.columns:
@@ -350,8 +265,38 @@ def _dataframe(data: Any, **kwargs: Any) -> Any:
     return st.dataframe(data, **kwargs)
 
 def _recommended_resume(detail: dict[str, Any]) -> str:
-    return str(detail.get("resume_used") or detail.get("tailored_resume_path") or detail.get("profile_resume_path") or detail.get("scheduler_resume_draft_path") or detail.get("resume_file_generated") or "")
+    return str(detail.get("resume_pdf_path") or detail.get("resume_docx_path") or detail.get("resume_used") or detail.get("tailored_resume_path") or detail.get("profile_resume_path") or detail.get("scheduler_resume_draft_path") or detail.get("resume_file_generated") or "")
 
+
+def _application_workspace_path(*items: dict[str, Any] | None) -> str:
+    for item in items:
+        if not item:
+            continue
+        direct = str(item.get("application_workspace_path") or "").strip()
+        if direct:
+            return direct
+        paths = item.get("paths")
+        if isinstance(paths, dict):
+            workspace = str(paths.get("workspace") or "").strip()
+            if workspace:
+                return workspace
+    return ""
+
+
+def _path_from_payload(payload: dict[str, Any] | None, *keys: str) -> str:
+    if not payload:
+        return ""
+    paths = payload.get("paths")
+    if isinstance(paths, dict):
+        for key in keys:
+            value = str(paths.get(key) or "").strip()
+            if value:
+                return value
+    for key in keys:
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
+    return ""
 
 def _company_careers_url(detail: dict[str, Any]) -> str:
     canonical = str(detail.get("canonical_company") or "").strip().lower()
@@ -401,29 +346,97 @@ def _generate_pack_for_detail(detail: dict[str, Any]) -> dict[str, Any]:
     return generate_answer_pack(detail, generated_resume_file=_recommended_resume(detail))
 
 
+def _cover_letter_markdown(cover: dict[str, Any] | None) -> str:
+    if not cover:
+        return ""
+    text = str(cover.get("cover_letter_markdown") or "")
+    if text:
+        return text
+    paths = cover.get("paths") or {}
+    md_path = paths.get("markdown") or str(cover_letter_paths(str((cover.get("metadata") or {}).get("canonical_job_id") or ""))["markdown"])
+    return read_local_text(md_path)
+
+
+def _cover_letter_path(cover: dict[str, Any] | None) -> str:
+    return _path_from_payload(cover, "formal_pdf", "formal_docx", "body_txt", "review_markdown", "markdown")
+
+def _cover_letter_copy_text(cover: dict[str, Any] | None) -> str:
+    body = str((cover or {}).get("cover_letter_body") or "").strip()
+    return body if body else _cover_letter_markdown(cover)
+
+def _cover_letter_short_intro(cover: dict[str, Any] | None) -> str:
+    configured = str((cover or {}).get("short_intro") or "").strip()
+    if configured:
+        return configured
+    markdown = _cover_letter_markdown(cover)
+    paragraphs = [part.strip() for part in markdown.split("\n\n") if part.strip()]
+    for paragraph in paragraphs:
+        if paragraph.startswith("#") or paragraph.startswith(">") or paragraph.startswith("Dear "):
+            continue
+        return paragraph
+    return ""
+
+
+def _load_cover_for_detail(detail: dict[str, Any]) -> dict[str, Any] | None:
+    canonical_id = str(detail.get("canonical_job_id") or "")
+    if not canonical_id:
+        return None
+    return load_cover_letter(canonical_id)
+
+
+def _cover_letter_generation_enabled(detail: dict[str, Any]) -> bool:
+    try:
+        return cover_letter_generation_enabled(detail)
+    except Exception:
+        return False
+
+
+def _generate_cover_for_detail(detail: dict[str, Any]) -> dict[str, Any]:
+    if not _cover_letter_generation_enabled(detail):
+        raise ValueError("Cover letter generation is disabled for this application effort.")
+    return generate_cover_letter(detail, generated_resume_file=_recommended_resume(detail))
+
+
 def _render_apply_shortcuts(detail: dict[str, Any], prefix: str) -> None:
     canonical_id = str(detail.get("canonical_job_id") or prefix)
     pack = _load_pack_for_detail(detail)
-    cols = st.columns(4)
+    cover = _load_cover_for_detail(detail)
+    cover_enabled = _cover_letter_generation_enabled(detail)
+    workspace_path = _application_workspace_path(detail, pack, cover)
+    resume_path = _recommended_resume(detail)
+    cols = st.columns(6)
     if cols[0].button("Generate Answer Pack", key=f"{prefix}_gen_{canonical_id}"):
         pack = _generate_pack_for_detail(detail)
-        st.success(f"Answer pack generated: {pack['paths']['markdown']}")
+        st.success(f"Answer pack generated: {_path_from_payload(pack, 'markdown')}")
         st.rerun()
-    if cols[1].button("Open Apply Page", key=f"{prefix}_open_apply_{canonical_id}"):
+    if cols[1].button("Generate Cover Letter", key=f"{prefix}_gen_cover_{canonical_id}", disabled=not cover_enabled):
+        try:
+            cover = _generate_cover_for_detail(detail)
+        except ValueError as exc:
+            st.warning(str(exc))
+        else:
+            st.success(f"Cover letter generated: {_cover_letter_path(cover)}")
+            st.rerun()
+    if cols[2].button("Open Apply Page", key=f"{prefix}_open_apply_{canonical_id}"):
         if open_apply_url(detail):
             st.success("Opened apply page")
         else:
             st.warning("No valid apply URL found.")
-    if cols[2].button("Open Company Careers", key=f"{prefix}_open_company_{canonical_id}"):
+    if cols[3].button("Open Company Careers", key=f"{prefix}_open_company_{canonical_id}"):
         if open_company_careers_page(_company_careers_url(detail)):
             st.success("Opened company careers page")
         else:
             st.warning("No company careers URL found.")
-    if cols[3].button("Open Resume File", key=f"{prefix}_open_resume_{canonical_id}"):
-        if open_resume_file(_recommended_resume(detail)):
+    if cols[4].button("Open Resume File", key=f"{prefix}_open_resume_{canonical_id}"):
+        if open_resume_file(resume_path):
             st.success("Opened resume file")
         else:
             st.warning("No generated resume file found.")
+    if cols[5].button("Open Application Folder", key=f"{prefix}_open_workspace_{canonical_id}"):
+        if open_application_folder(workspace_path):
+            st.success("Opened application folder")
+        else:
+            st.warning("No generated application folder found.")
     if pack:
         answers = pack.get("answers") or {}
         c1, c2, c3, c4 = st.columns(4)
@@ -435,18 +448,15 @@ def _render_apply_shortcuts(detail: dict[str, Any], prefix: str) -> None:
             _copy_button("Copy Work Authorization", str(answers.get("work_authorization") or ""), f"{prefix}_copy_auth_{canonical_id}")
         with c4:
             _copy_button("Copy Tell Me", str(answers.get("tell_me_about_yourself") or ""), f"{prefix}_copy_tell_{canonical_id}")
-
+    if cover:
+        c1, c2 = st.columns(2)
+        with c1:
+            _copy_button("Copy Cover Letter", _cover_letter_copy_text(cover), f"{prefix}_copy_cover_{canonical_id}")
+        with c2:
+            _copy_button("Copy Short Intro", _cover_letter_short_intro(cover), f"{prefix}_copy_cover_intro_{canonical_id}")
 
 def overview(df: pd.DataFrame) -> None:
     st.header("Overview")
-    latest = _latest_collection_summary()
-    if latest:
-        st.caption(
-            "Last collection: "
-            f"{latest['last_run_at']} UTC | {latest['run_id']} | "
-            f"raw {latest['raw_count']} / normalized {latest['normalized_count']} | "
-            f"healthy sources {latest['healthy_sources']}/{latest['source_count']}"
-        )
     today_new = int(((df.get("freshness_label") == "new_today") | (df.get("is_new_since_last_run") == 1)).sum()) if not df.empty else 0
     high_score = int((df.get("score", pd.Series(dtype=int)).fillna(0).astype(int) >= 70).sum()) if not df.empty else 0
     must_apply = int((df.get("score", pd.Series(dtype=int)).fillna(0).astype(int) >= 85).sum()) if not df.empty else 0
@@ -457,7 +467,7 @@ def overview(df: pd.DataFrame) -> None:
     cols = st.columns(7)
     for col, label, value in zip(cols, ["New", "Score >= 70", "Must Apply", "Applied", "Pending", "Interview", "Rejected"], [today_new, high_score, must_apply, applied, pending, interview, rejected]):
         col.metric(label, value)
-    c1, c2 = st.columns(2)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.subheader("By Country")
         if "country" in df:
@@ -466,6 +476,14 @@ def overview(df: pd.DataFrame) -> None:
         st.subheader("By Role Category")
         if "role_category" in df:
             st.bar_chart(df["role_category"].fillna("unknown").value_counts())
+    with c3:
+        st.subheader("By Role Family")
+        if "role_family" in df:
+            st.bar_chart(df["role_family"].fillna("unknown").value_counts())
+    with c4:
+        st.subheader("By Fit")
+        if "fit_category" in df:
+            st.bar_chart(df["fit_category"].fillna("unknown").value_counts())
 
 
 def job_radar(df: pd.DataFrame) -> None:
@@ -481,23 +499,23 @@ def job_radar(df: pd.DataFrame) -> None:
     freshness = c4.multiselect("Freshness", _safe_list(df, "freshness_label"), key="radar_freshness")
     c5, c6, c7, c8 = st.columns(4)
     role = c5.multiselect("Role", _safe_list(df, "role_category"), key="radar_role")
-    source = c6.multiselect("Source", _safe_list(df, "source"), key="radar_source")
-    status = c7.multiselect("Status", _safe_list(df, "status"), key="radar_status")
+    role_family = c6.multiselect("Role Family", _safe_list(df, "role_family"), key="radar_role_family")
+    fit_category = c7.multiselect("Fit", _safe_list(df, "fit_category"), key="radar_fit_category")
     score_range = c8.slider("Score range", 0, 100, (DASHBOARD_DEFAULT_MIN_SCORE, 100))
+    c9, c10 = st.columns(2)
+    source = c9.multiselect("Source", _safe_list(df, "source"), key="radar_source")
+    status = c10.multiselect("Status", _safe_list(df, "status"), key="radar_status")
     keyword = st.text_input("Keyword search")
-    only_new = st.checkbox("Only new since last collection", key="radar_only_new")
 
-    for column, values in [("country", country), ("company", company), ("recommendation", recommendation), ("freshness_label", freshness), ("role_category", role), ("source", source), ("status", status)]:
+    for column, values in [("country", country), ("company", company), ("recommendation", recommendation), ("freshness_label", freshness), ("role_category", role), ("role_family", role_family), ("fit_category", fit_category), ("source", source), ("status", status)]:
         if values:
             filtered = filtered[filtered[column].fillna("").isin(values)]
-    if only_new and "new_since_last_run" in filtered:
-        filtered = filtered[filtered["new_since_last_run"]]
     filtered = filtered[filtered["score"].fillna(0).astype(int).between(score_range[0], score_range[1])]
     if keyword:
         haystack = filtered.fillna("").astype(str).agg(" ".join, axis=1).str.lower()
         filtered = filtered[haystack.str.contains(keyword.lower(), regex=False)]
 
-    display_cols = ["new_since_last_run", "score", "score_band", "recommendation", "freshness_label", "title", "company", "country", "location", "role_category", "seniority", "posted_at", "first_seen_at", "last_seen_at", "updated_at", "source", "apply_url", "status", "next_action", "canonical_job_id"]
+    display_cols = ["score", "score_band", "recommendation", "fit_category", "freshness_label", "title", "company", "country", "location", "role_family", "role_category", "seniority", "posted_at", "first_seen_at", "source", "apply_url", "status", "next_action", "canonical_job_id"]
     _dataframe(filtered[[c for c in display_cols if c in filtered.columns]], use_container_width=True, hide_index=True)
 
     manual_review = filtered[(filtered["score"].fillna(0).astype(int) >= 35) & (filtered["score"].fillna(0).astype(int) < 55)]
@@ -516,6 +534,8 @@ def job_radar(df: pd.DataFrame) -> None:
             _render_apply_shortcuts(detail, "radar")
             st.markdown("**Apply URL**")
             st.write(_apply_url(detail))
+            st.markdown("**Role family / fit**")
+            st.write(f"{detail.get('role_family') or 'unknown'} / {detail.get('fit_category') or 'unknown'}")
             st.markdown("**Matched keywords**")
             st.write(detail.get("matched_keywords"))
             st.markdown("**Missing keywords**")
@@ -640,7 +660,7 @@ def resume_center(df: pd.DataFrame) -> None:
     if tailored_df.empty:
         st.info("No tailored resumes generated yet.")
     else:
-        tailored_columns = ["campaign_date", "title", "company", "score", "application_effort", "campaign_status", "application_status", "resume_profile", "tailored_resume_path", "answer_pack_path", "canonical_job_id"]
+        tailored_columns = ["campaign_date", "title", "company", "score", "application_effort", "campaign_status", "application_status", "resume_profile", "application_workspace_path", "resume_pdf_path", "tailored_resume_path", "answer_pack_path", "cover_letter_pdf_path", "cover_letter_body_path", "cover_letter_path", "canonical_job_id"]
         _dataframe(tailored_df[[c for c in tailored_columns if c in tailored_df.columns]], use_container_width=True, hide_index=True)
 
     with st.expander("Scheduler Drafts", expanded=False):
@@ -681,8 +701,20 @@ def apply_assist_page(df: pd.DataFrame) -> None:
     canonical_id = str(options[selected_label])
     detail = get_job_detail(canonical_id, DEFAULT_DB) or {}
     pack = _load_pack_for_detail(detail)
+    cover = _load_cover_for_detail(detail)
     apply_url = _apply_url(detail)
     resume_path = _recommended_resume(detail)
+    workspace_path = _application_workspace_path(detail, pack, cover)
+    resume_pdf_path = str(detail.get("resume_pdf_path") or "")
+    resume_docx_path = str(detail.get("resume_docx_path") or "")
+    if not resume_pdf_path and resume_path.lower().endswith(".pdf"):
+        resume_pdf_path = resume_path
+    if not resume_docx_path and resume_path.lower().endswith(".docx"):
+        resume_docx_path = resume_path
+    answer_pack_path = _path_from_payload(pack, "markdown")
+    cover_letter_pdf_path = _path_from_payload(cover, "formal_pdf")
+    cover_letter_docx_path = _path_from_payload(cover, "formal_docx")
+    cover_letter_body_path = _path_from_payload(cover, "body_txt")
 
     top = st.columns(4)
     top[0].metric("Score", int(detail.get("score") or 0))
@@ -714,6 +746,13 @@ def apply_assist_page(df: pd.DataFrame) -> None:
     else:
         st.info("Generate an answer pack for this job.")
 
+    st.markdown("**Cover letter**")
+    if cover:
+        st.code(_cover_letter_path(cover))
+        st.markdown(_cover_letter_markdown(cover))
+    else:
+        st.info("Generate a cover letter for this job.")
+
     st.subheader("Application Status")
     notes = st.text_area("Notes", value=str(detail.get("notes") or ""), key=f"assist_notes_{canonical_id}")
     next_action = st.text_input("Next action", value=str(detail.get("next_action") or ""), key=f"assist_next_{canonical_id}")
@@ -726,11 +765,20 @@ def apply_assist_page(df: pd.DataFrame) -> None:
             status="applied",
             applied_at=now_utc_iso(),
             resume_used=resume_path,
+            cover_letter_used=_cover_letter_path(cover),
             apply_url=apply_url,
             notes=notes,
             next_action=next_action,
             confirmation_number=confirmation_number,
             confirmation_snippet=confirmation_snippet,
+            application_workspace_path=workspace_path,
+            resume_pdf_path=resume_pdf_path,
+            resume_docx_path=resume_docx_path,
+            cover_letter_pdf_path=cover_letter_pdf_path,
+            cover_letter_docx_path=cover_letter_docx_path,
+            cover_letter_body_path=cover_letter_body_path,
+            answer_pack_path=answer_pack_path,
+            job_description_path=str(detail.get("job_description_path") or ""),
             db_path=DEFAULT_DB,
         )
         st.success("Marked as applied")
@@ -761,10 +809,14 @@ def apply_assist_page(df: pd.DataFrame) -> None:
 
 
 def _campaign_resume_path(row: dict[str, Any]) -> str:
-    return str(row.get("tailored_resume_path") or row.get("profile_resume_path") or row.get("resume_used") or "")
-
+    return str(row.get("resume_pdf_path") or row.get("tailored_resume_path") or row.get("profile_resume_path") or row.get("resume_used") or "")
 
 def _truthy(value: Any) -> bool:
+    try:
+        if pd.isna(value):
+            return False
+    except (TypeError, ValueError):
+        pass
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
@@ -796,9 +848,15 @@ def _generate_tailored_resume_for_campaign(row: dict[str, Any]) -> str:
     paths = generate_resume(master_resume_path=source_path, job=detail, keyword_info=keyword_info)
     resume_path = str(paths.get("pdf") or paths.get("docx") or paths.get("markdown") or "")
     if resume_path:
-        update_campaign_item_files(str(row.get("campaign_date") or ""), canonical_id, tailored_resume_path=resume_path, db_path=DEFAULT_DB)
+        update_campaign_item_files(
+            str(row.get("campaign_date") or ""),
+            canonical_id,
+            tailored_resume_path=resume_path,
+            application_workspace_path=str(paths.get("workspace") or ""),
+            resume_pdf_path=str(paths.get("pdf") or ""),
+            db_path=DEFAULT_DB,
+        )
     return resume_path
-
 
 def _generate_answer_pack_for_campaign(row: dict[str, Any]) -> str:
     if not _truthy(row.get("allow_manual_generate_answer_pack")):
@@ -806,14 +864,44 @@ def _generate_answer_pack_for_campaign(row: dict[str, Any]) -> str:
     canonical_id = str(row.get("canonical_job_id") or "")
     detail = get_job_detail(canonical_id, DEFAULT_DB) or row
     pack = generate_answer_pack(detail, generated_resume_file=_campaign_resume_path(row))
-    answer_path = str((pack.get("paths") or {}).get("markdown") or "")
+    answer_path = _path_from_payload(pack, "markdown")
     if answer_path:
-        update_campaign_item_files(str(row.get("campaign_date") or ""), canonical_id, answer_pack_path=answer_path, db_path=DEFAULT_DB)
+        update_campaign_item_files(
+            str(row.get("campaign_date") or ""),
+            canonical_id,
+            answer_pack_path=answer_path,
+            application_workspace_path=_application_workspace_path(pack, row),
+            db_path=DEFAULT_DB,
+        )
     return answer_path
 
+def _generate_cover_letter_for_campaign(row: dict[str, Any]) -> str:
+    if not _truthy(row.get("allow_manual_generate_cover_letter")):
+        return ""
+    if not _cover_letter_generation_enabled(row):
+        return ""
+    canonical_id = str(row.get("canonical_job_id") or "")
+    detail = get_job_detail(canonical_id, DEFAULT_DB) or row
+    try:
+        cover = generate_cover_letter(detail, generated_resume_file=_campaign_resume_path(row))
+    except ValueError:
+        return ""
+    cover_path = _cover_letter_path(cover)
+    if cover_path:
+        update_campaign_item_files(
+            str(row.get("campaign_date") or ""),
+            canonical_id,
+            cover_letter_path=cover_path,
+            application_workspace_path=_application_workspace_path(cover, row),
+            cover_letter_pdf_path=_path_from_payload(cover, "formal_pdf"),
+            cover_letter_body_path=_path_from_payload(cover, "body_txt"),
+            db_path=DEFAULT_DB,
+        )
+    return cover_path
 
 def application_campaign_page(df: pd.DataFrame) -> None:
     st.header("Application Campaign")
+    st.caption("After running scheduler / rescoring jobs, run `python -B -m job_pipeline.campaign --today`, then restart or refresh this dashboard.")
     default_date = get_latest_campaign_date(DEFAULT_DB) or today_yyyymmdd()
     c1, c2 = st.columns([1, 2])
     campaign_date = c1.text_input("Campaign date", value=default_date)
@@ -829,18 +917,24 @@ def application_campaign_page(df: pd.DataFrame) -> None:
         st.info("No campaign items for this date. Generate a campaign first.")
         return
 
+    stale_series = campaign_df.get("campaign_stale", pd.Series(False, index=campaign_df.index)).apply(_truthy)
+    stale_count = int(stale_series.sum())
+    if stale_count:
+        st.warning(f"{stale_count} stale campaign row(s). Some campaign rows were generated before the latest job scoring update. Regenerate today's campaign to refresh effort/reason.")
+
     effort = campaign_df.get("application_effort", pd.Series(dtype=str)).fillna("")
-    status = campaign_df.get("campaign_status", pd.Series(dtype=str)).fillna("")
+    bucket_series = campaign_df.get("application_bucket", pd.Series("", index=campaign_df.index))
     applied_mask = _campaign_applied_mask(campaign_df)
-    queued = (status == "queued") & ~applied_mask
+    actionable_mask = bucket_series == "Actionable"
+    skipped_mask = bucket_series == "Skipped"
     metrics = st.columns(7)
     metrics[0].metric("Deep Tailor", int((effort == "deep_tailor").sum()))
     metrics[1].metric("Standard Tailor", int((effort == "standard_tailor").sum()))
     metrics[2].metric("Quick Apply", int((effort == "quick_apply").sum()))
-    metrics[3].metric("Estimated Minutes", int(campaign_df.loc[queued, "estimated_minutes"].fillna(0).astype(int).sum()) if "estimated_minutes" in campaign_df else 0)
+    metrics[3].metric("Estimated Minutes", int(campaign_df.loc[actionable_mask, "estimated_minutes"].fillna(0).astype(int).sum()) if "estimated_minutes" in campaign_df else 0)
     metrics[4].metric("Applied", int(applied_mask.sum()))
-    metrics[5].metric("Not Applied", int((~applied_mask).sum()))
-    metrics[6].metric("Remaining", int(queued.sum()))
+    metrics[5].metric("Skipped", int(skipped_mask.sum()))
+    metrics[6].metric("Actionable", int(actionable_mask.sum()))
 
     bucket_view = st.radio("Application bucket", CAMPAIGN_APPLICATION_BUCKETS, horizontal=True, key="campaign_application_bucket")
     bucket_df = _filter_campaign_bucket(campaign_df, bucket_view)
@@ -850,55 +944,81 @@ def application_campaign_page(df: pd.DataFrame) -> None:
     country_filter = f2.multiselect("Country", _safe_list(bucket_df, "country"), key="campaign_country")
     profile_filter = f3.multiselect("Resume Profile", _safe_list(bucket_df, "resume_profile"), key="campaign_resume_profile")
     status_filter = f4.multiselect("Campaign Status", _safe_list(bucket_df, "campaign_status"), key="campaign_status")
-    f5, f6 = st.columns([1, 3])
-    score_range = f5.slider("Score range", 0, 100, (0, 100), key="campaign_score_range")
-    company_filter = f6.multiselect("Company", _safe_list(bucket_df, "company"), key="campaign_company")
+    f5, f6, f7, f8 = st.columns(4)
+    role_family_filter = f5.multiselect("Role Family", _safe_list(bucket_df, "role_family"), key="campaign_role_family")
+    fit_category_filter = f6.multiselect("Fit", _safe_list(bucket_df, "fit_category"), key="campaign_fit_category")
+    score_range = f7.slider("Score range", 0, 100, (0, 100), key="campaign_score_range")
+    company_filter = f8.multiselect("Company", _safe_list(bucket_df, "company"), key="campaign_company")
     for column, values in [
         ("application_effort", effort_filter),
         ("country", country_filter),
         ("resume_profile", profile_filter),
         ("campaign_status", status_filter),
+        ("role_family", role_family_filter),
+        ("fit_category", fit_category_filter),
         ("company", company_filter),
     ]:
         if values and column in filtered:
             filtered = filtered[filtered[column].fillna("").isin(values)]
-    if "score" in filtered:
-        filtered = filtered[filtered["score"].fillna(0).astype(int).between(score_range[0], score_range[1])]
-    filtered = _sort_campaign_display(filtered)
+    score_column = "campaign_score" if "campaign_score" in filtered else "score"
+    if score_column in filtered:
+        score_values = pd.to_numeric(filtered[score_column], errors="coerce").fillna(0).astype(int)
+        filtered = filtered[score_values.between(score_range[0], score_range[1])]
 
     display_cols = [
-        "score", "score_band", "application_effort", "title", "company", "country", "location",
+        "campaign_score", "campaign_score_band", "current_score", "campaign_stale", "application_effort", "role_family", "fit_category", "title", "company", "country", "location",
         "resume_profile", "campaign_reason", "estimated_minutes", "application_bucket", "apply_url",
         "auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack",
-        "profile_resume_path", "tailored_resume_path", "answer_pack_path", "campaign_status", "application_status", "canonical_job_id",
+        "auto_generate_cover_letter", "allow_manual_generate_cover_letter",
+        "profile_resume_path", "application_workspace_path", "resume_pdf_path", "tailored_resume_path",
+        "answer_pack_path", "cover_letter_pdf_path", "cover_letter_body_path", "cover_letter_path",
+        "campaign_status", "application_status", "canonical_job_id",
     ]
     _dataframe(filtered[[c for c in display_cols if c in filtered.columns]], use_container_width=True, hide_index=True)
     if filtered.empty:
         st.info("No campaign items match the current filters.")
         return
 
-    options = {
-        f"{int(row.get('score') or 0)} - {row.get('application_effort')} - {row.get('company')} - {row.get('title')} [{row.get('canonical_job_id')} ]": row.get("canonical_job_id")
-        for _, row in filtered.iterrows()
-    }
+    options = {}
+    for _, row in filtered.iterrows():
+        score_value = _int_display(row.get("campaign_score"))
+        label = f"{score_value} - {row.get('application_effort')} - {row.get('company')} - {row.get('title')} [{row.get('canonical_job_id')} ]"
+        options[label] = row.get("canonical_job_id")
     selected_label = st.selectbox("Campaign item", list(options.keys()))
     canonical_id = str(options[selected_label])
     row = filtered[filtered["canonical_job_id"] == canonical_id].iloc[0].to_dict()
     effort_value = str(row.get("application_effort") or "")
     resume_path = _campaign_resume_path(row)
+    workspace_path = _application_workspace_path(row)
+    answer_path = str(row.get("answer_pack_path") or "")
+    cover_pdf_path = str(row.get("cover_letter_pdf_path") or "")
+    cover_body_path = str(row.get("cover_letter_body_path") or "")
 
     st.subheader(f"{row.get('title')} - {row.get('company')}")
-    top = st.columns(5)
-    top[0].metric("Score", int(row.get("score") or 0))
-    top[1].metric("Effort", effort_value)
-    top[2].metric("Status", str(row.get("campaign_status") or ""))
-    top[3].metric("Country", str(row.get("country") or ""))
-    top[4].metric("Minutes", int(row.get("estimated_minutes") or 0))
+    top = st.columns(6)
+    top[0].metric("Campaign Score", _int_display(row.get("campaign_score")))
+    top[1].metric("Current Score", _int_display(row.get("current_score")))
+    top[2].metric("Effort", effort_value)
+    top[3].metric("Status", str(row.get("campaign_status") or ""))
+    top[4].metric("Country", str(row.get("country") or ""))
+    top[5].metric("Minutes", _int_display(row.get("estimated_minutes")))
+    if row.get("campaign_stale"):
+        st.warning("This campaign item was generated before the latest job scoring update. Regenerate today's campaign to refresh effort/reason.")
 
+    if "role_family" in campaign_df or "fit_category" in campaign_df:
+        chart_cols = st.columns(2)
+        with chart_cols[0]:
+            if "role_family" in campaign_df:
+                st.bar_chart(campaign_df["role_family"].fillna("unknown").value_counts())
+        with chart_cols[1]:
+            if "fit_category" in campaign_df:
+                st.bar_chart(campaign_df["fit_category"].fillna("unknown").value_counts())
     info_cols = st.columns(2)
     with info_cols[0]:
         st.markdown("**Apply URL**")
         st.write(row.get("apply_url") or row.get("job_url") or "")
+        st.markdown("**Application folder**")
+        st.code(workspace_path or "")
         st.markdown("**Campaign reason**")
         st.write(row.get("campaign_reason") or "")
         st.markdown("**Profile resume**")
@@ -908,42 +1028,74 @@ def application_campaign_page(df: pd.DataFrame) -> None:
         elif effort_value in {"deep_tailor", "standard_tailor", "quick_apply"} and not row.get("profile_resume_path"):
             st.warning("No profile resume path configured for this resume profile.")
     with info_cols[1]:
-        st.markdown("**Tailored resume**")
-        st.code(str(row.get("tailored_resume_path") or ""))
+        st.markdown("**Resume PDF**")
+        st.code(str(row.get("resume_pdf_path") or row.get("tailored_resume_path") or ""))
         st.markdown("**Answer pack**")
-        st.code(str(row.get("answer_pack_path") or ""))
+        st.code(answer_path)
+        st.markdown("**Cover letter PDF**")
+        st.code(cover_pdf_path or str(row.get("cover_letter_path") or row.get("application_cover_letter_used") or ""))
+        st.markdown("**Cover letter body**")
+        st.code(cover_body_path)
         st.markdown("**Red flags**")
         st.write(row.get("red_flags") or [])
-
     note_key = f"campaign_note_{campaign_date}_{canonical_id}"
     notes = st.text_area("Note", value=str(row.get("notes") or row.get("application_notes") or ""), key=note_key)
 
-    actions = st.columns(4)
-    if actions[0].button("Open Apply Page", key=f"campaign_open_apply_{canonical_id}"):
+    file_actions = st.columns(6)
+    if file_actions[0].button("Open Apply Page", key=f"campaign_open_apply_{canonical_id}"):
         if open_apply_url(row):
             st.success("Opened apply page")
         else:
             st.warning("No valid apply URL found.")
-    if actions[1].button("Open Resume File", key=f"campaign_open_resume_{canonical_id}"):
-        if open_resume_file(resume_path):
+    if file_actions[1].button("Open Application Folder", key=f"campaign_open_workspace_{canonical_id}"):
+        if open_application_folder(workspace_path):
+            st.success("Opened application folder")
+        else:
+            st.warning("No generated application folder found.")
+    if file_actions[2].button("Open Resume PDF", key=f"campaign_open_resume_{canonical_id}"):
+        if open_resume_file(str(row.get("resume_pdf_path") or resume_path)):
             st.success("Opened resume file")
         else:
             st.warning("No resume file found.")
-    if actions[2].button("Generate Tailored Resume", key=f"campaign_gen_resume_{canonical_id}", disabled=not _truthy(row.get("allow_manual_generate_resume"))):
+    if file_actions[3].button("Open Cover Letter PDF", key=f"campaign_open_cover_{canonical_id}"):
+        if open_resume_file(cover_pdf_path or row.get("cover_letter_path") or row.get("application_cover_letter_used")):
+            st.success("Opened cover letter file")
+        else:
+            st.warning("No cover letter file found.")
+    if file_actions[4].button("Open Answer Pack", key=f"campaign_open_pack_{canonical_id}"):
+        if open_resume_file(answer_path):
+            st.success("Opened answer pack")
+        else:
+            st.warning("No answer pack file found.")
+    with file_actions[5]:
+        body_text = read_local_text(cover_body_path)
+        if body_text:
+            _copy_button("Copy Cover Letter Body", body_text, f"campaign_copy_cover_body_{canonical_id}")
+        else:
+            st.button("Copy Cover Letter Body", key=f"campaign_copy_cover_body_disabled_{canonical_id}", disabled=True)
+
+    actions = st.columns(3)
+    if actions[0].button("Generate Tailored Resume", key=f"campaign_gen_resume_{canonical_id}", disabled=not _truthy(row.get("allow_manual_generate_resume"))):
         generated_path = _generate_tailored_resume_for_campaign(row)
         if generated_path:
             st.success(f"Tailored resume generated: {generated_path}")
         else:
             st.warning("Resume generation did not produce a file.")
         st.rerun()
-    if actions[3].button("Generate Answer Pack", key=f"campaign_gen_pack_{canonical_id}", disabled=not _truthy(row.get("allow_manual_generate_answer_pack"))):
+    if actions[1].button("Generate Answer Pack", key=f"campaign_gen_pack_{canonical_id}", disabled=not _truthy(row.get("allow_manual_generate_answer_pack"))):
         answer_path = _generate_answer_pack_for_campaign(row)
         if answer_path:
             st.success(f"Answer pack generated: {answer_path}")
         else:
             st.warning("Answer pack generation did not produce a file.")
         st.rerun()
-
+    if actions[2].button("Generate Cover Letter", key=f"campaign_gen_cover_{canonical_id}", disabled=not _truthy(row.get("allow_manual_generate_cover_letter"))):
+        cover_path = _generate_cover_letter_for_campaign(row)
+        if cover_path:
+            st.success(f"Cover letter generated: {cover_path}")
+        else:
+            st.warning("Cover letter generation did not produce a file.")
+        st.rerun()
     status_actions = st.columns(5)
     if status_actions[0].button("Mark Applied", key=f"campaign_applied_{canonical_id}"):
         update_campaign_item_status(campaign_date, canonical_id, "applied", notes=notes, db_path=DEFAULT_DB)
@@ -969,6 +1121,7 @@ def application_campaign_page(df: pd.DataFrame) -> None:
         update_campaign_item_status(campaign_date, canonical_id, str(row.get("campaign_status") or "queued"), notes=notes, db_path=DEFAULT_DB)
         st.success("Note saved")
         st.rerun()
+
 def search_coverage_page() -> None:
     st.header("Search Coverage")
     rows = get_search_coverage_rows(DEFAULT_DB)
@@ -988,7 +1141,7 @@ def search_coverage_page() -> None:
     metrics[3].metric("Score >= 70", int(df["high_score_count_70"].sum()))
     metrics[4].metric("Score >= 85", int(df["must_apply_count_85"].sum()))
     metrics[5].metric("Hard skipped", int(df["skipped_by_filter_count"].sum()))
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.subheader("By Source")
         st.bar_chart(df.groupby("source")["raw_count"].sum())
@@ -996,6 +1149,10 @@ def search_coverage_page() -> None:
         st.subheader("By Country")
         st.bar_chart(df.groupby("country")["raw_count"].sum())
     with c3:
+        st.subheader("By Family")
+        if "role_family" in df:
+            st.bar_chart(df.groupby("role_family")["raw_count"].sum())
+    with c4:
         st.subheader("By Query")
         st.bar_chart(df.groupby("query")["raw_count"].sum().sort_values(ascending=False).head(20))
     st.subheader("Zero-result Queries")
@@ -1048,7 +1205,7 @@ def manual_search_page() -> None:
         title = st.text_input("Title")
         company = st.text_input("Company")
         location = st.text_input("Location")
-        country_value = st.selectbox("Country", _configured_country_options())
+        country_value = st.selectbox("Country", ["Canada", "Singapore", "Hong Kong", "Remote", ""])
         job_url = st.text_input("Job URL")
         apply_url = st.text_input("Apply URL")
         source_name = st.text_input("Source", value="manual_search")
@@ -1090,26 +1247,24 @@ def main() -> None:
     with tabs[0]:
         overview(df)
     with tabs[1]:
-        setup_search_scope_page()
-    with tabs[2]:
         job_radar(df)
-    with tabs[3]:
+    with tabs[2]:
         application_tracker(df)
-    with tabs[4]:
+    with tabs[3]:
         company_tracker()
-    with tabs[5]:
+    with tabs[4]:
         resume_center(df)
-    with tabs[6]:
+    with tabs[5]:
         apply_assist_page(df)
-    with tabs[7]:
+    with tabs[6]:
         application_campaign_page(df)
-    with tabs[8]:
+    with tabs[7]:
         search_coverage_page()
-    with tabs[9]:
+    with tabs[8]:
         source_health_page()
-    with tabs[10]:
+    with tabs[9]:
         manual_search_page()
-    with tabs[11]:
+    with tabs[10]:
         dedupe_audit_page()
 
 if __name__ == "__main__":

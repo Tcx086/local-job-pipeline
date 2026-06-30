@@ -1,0 +1,78 @@
+templates_v2:
+  quality_assurance:
+    enabled_for:
+      role_family:
+        - quality_assurance
+      title_contains:
+        - quality assurance
+        - quality analyst
+        - qa analyst
+        - quality control
+    blocked_phrases:
+      - practical finance
+      - investment
+      - trading
+      - aerospace quality certification
+      - six sigma certification
+      - iso audit ownership
+    body:
+      opening: "I am applying for the {title} role at {company} because the position appears to require careful documentation, process follow-through, data accuracy, and consistent communication across operational workflows. These are areas where my background in structured tracking, reporting, and data quality work is most relevant."
+      evidence_single: "In my previous project and work experience, I {evidence_1}."
+      evidence_double: "In my previous project and work experience, I {evidence_1}. I have also {evidence_2}."
+      learning: "I understand that {company}'s quality assurance environment has its own role-specific standards and systems, and I would approach that learning curve carefully."
+      closing: "I would bring a detail-oriented, reliable, and documentation-focused working style to the team."
+
+  data_market_data:
+    enabled_for:
+      resume_profile:
+        - data_market_data
+    body:
+      opening: "I am applying for the {title} role at {company} because it connects data analysis, reporting accuracy, and practical decision-support work."
+      evidence_single: "My relevant experience includes {evidence_1}."
+      evidence_double: "My relevant experience includes {evidence_1}. I have also {evidence_2}."
+      learning: "I would be careful not only with the technical work, but also with data quality, documentation, and how the output supports business users."
+      closing: "I would bring a structured and analytical working style to the team."
+
+  risk_operations:
+    enabled_for:
+      resume_profile:
+        - risk_operations
+    body:
+      opening: "I am applying for the {title} role at {company} because the role appears to require careful risk awareness, documentation, reporting, and operational follow-through."
+      evidence_single: "My relevant background includes {evidence_1}."
+      evidence_double: "My relevant background includes {evidence_1}. I have also {evidence_2}."
+      learning: "I understand that risk and operations work requires accuracy, consistency, and clear escalation rather than overclaiming or guessing."
+      closing: "I would bring a careful, process-oriented approach to supporting the team."
+
+  trading_operations:
+    enabled_for:
+      resume_profile:
+        - trading_operations
+    body:
+      opening: "I am applying for the {title} role at {company} because it aligns with my interest in market data, exchange workflows, operational checks, and trade-support processes."
+      evidence_single: "My relevant experience includes {evidence_1}."
+      evidence_double: "My relevant experience includes {evidence_1}. I have also {evidence_2}."
+      learning: "I would approach the role with attention to accuracy, timing, documentation, and the operational impact of small errors."
+      closing: "I would be excited to contribute a careful and technically curious working style to the team."
+
+  api_technical_operations:
+    enabled_for:
+      resume_profile:
+        - api_technical_operations
+    body:
+      opening: "I am applying for the {title} role at {company} because it appears to combine technical troubleshooting, structured communication, and practical support for users or internal teams."
+      evidence_single: "My relevant background includes {evidence_1}."
+      evidence_double: "My relevant background includes {evidence_1}. I have also {evidence_2}."
+      learning: "I would focus on understanding the system clearly, documenting issues carefully, and communicating in a way that helps both technical and non-technical stakeholders."
+      closing: "I would bring a patient, structured, and problem-solving-oriented approach to the role."
+
+  client_finance:
+    enabled_for:
+      role_family:
+        - client_finance
+    body:
+      opening: "I am applying for the {title} role at {company} because it appears to require budget awareness, reporting discipline, data accuracy, and clear communication with project or account teams."
+      evidence_single: "My relevant experience includes {evidence_1}."
+      evidence_double: "My relevant experience includes {evidence_1}. I have also {evidence_2}."
+      learning: "I would be careful with financial details, documentation, and follow-up, while continuing to learn the company-specific billing, forecasting, and reporting process."
+      closing: "I would bring a reliable and detail-oriented working style to the team."

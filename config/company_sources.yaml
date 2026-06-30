@@ -1,7 +1,18 @@
-﻿{
-  "Example Country": [
-    "Example Analytics Co",
-    "Example Operations Inc",
-    "Example Support Systems"
+{
+  "Canada": [
+    "RBC", "TD", "BMO", "CIBC", "Scotiabank", "National Bank", "Manulife", "Sun Life",
+    "Capital One Canada", "Wealthsimple", "TMX Group", "CI Financial", "Purpose Investments",
+    "Coinsquare", "WonderFi", "Chainalysis", "Coinbase Canada", "Stripe Canada", "Shopify",
+    "Thomson Reuters", "Morningstar Canada"
+  ],
+  "Singapore": [
+    "Binance", "OKX", "Bybit", "Crypto.com", "Coinbase", "Gemini", "GSR", "Wintermute",
+    "Cumberland", "Jump Trading", "QCP", "DBS", "OCBC", "UOB", "Standard Chartered", "Citi",
+    "JPMorgan", "Goldman Sachs", "Stripe", "Wise", "Revolut", "Chainalysis", "Fireblocks"
+  ],
+  "Hong Kong": [
+    "HashKey", "OSL", "Animoca Brands", "Binance", "OKX", "Bybit", "Crypto.com", "GSR",
+    "Wintermute", "QRT", "HKEX", "HSBC", "Standard Chartered", "Citi", "JPMorgan",
+    "Goldman Sachs", "BlackRock", "Morgan Stanley", "UBS", "Flow Traders", "Jane Street", "Jump Trading"
   ]
 }

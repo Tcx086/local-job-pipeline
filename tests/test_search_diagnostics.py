@@ -111,6 +111,7 @@ class SearchDiagnosticsTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         row = rows[0]
         self.assertEqual(row["location"], "Toronto")
+        self.assertEqual(row["role_family"], "financial_data_analysis")
         self.assertEqual(row["raw_count"], 1)
         self.assertEqual(row["normalized_count"], 1)
         self.assertEqual(row["scored_count"], 1)

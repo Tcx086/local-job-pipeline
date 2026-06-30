@@ -1,0 +1,61 @@
+name: "Candidate Name"
+headline: "Early-career analyst candidate"
+location: "City, Country"
+contact:
+  location: "City, Country"
+  email: "candidate@example.com"
+  phone: ""
+  linkedin: ""
+  github: ""
+contacts:
+  email: "candidate@example.com"
+  phone: ""
+  linkedin: ""
+summary:
+  - "Early-career analyst candidate with example experience in Python, spreadsheets, reporting, and structured problem solving."
+  - "Interested in local-first workflows that support careful manual review before applications are submitted."
+education:
+  - degree: "Example Degree"
+    school: "Example University"
+    date: "Example Year"
+    details:
+      - "Example coursework in data analysis"
+      - "Example coursework in business operations"
+projects:
+  example_data_project:
+    title: "Example Data Analysis Project"
+    type: "Example Project"
+    dates: "Example Year"
+    bullets:
+      - "Built a small local analysis workflow using Python and spreadsheet data."
+      - "Created summary tables and simple charts to support review."
+  example_operations_project:
+    title: "Example Operations Review Project"
+    type: "Example Project"
+    dates: "Example Year"
+    bullets:
+      - "Reviewed sample records for completeness and documented follow-up questions."
+      - "Prepared a concise summary for a manual decision checkpoint."
+experience:
+  - title: "Example Role"
+    company: "Example Company"
+    location: "City, Country"
+    dates: "Example Dates"
+    bullets:
+      - "Supported example reporting, documentation, and data quality checks."
+      - "Coordinated example follow-ups with a small team using shared trackers."
+skills:
+  programming_data:
+    - "Python"
+    - "SQL"
+    - "Spreadsheet analysis"
+  data_reporting:
+    - "Data cleaning"
+    - "Summary tables"
+    - "Dashboard review"
+  operations:
+    - "Documentation"
+    - "Manual QA"
+    - "Process tracking"
+languages:
+  - "English"

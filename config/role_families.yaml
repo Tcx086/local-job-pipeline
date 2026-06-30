@@ -1,0 +1,134 @@
+settings:
+  enabled_families:
+    - digital_assets_research
+    - financial_data_analysis
+    - risk_fraud_compliance
+    - technical_operations
+    - banking_operations
+    - ai_data_governance
+  mode_families:
+    strict:
+      - digital_assets_research
+      - financial_data_analysis
+      - risk_fraud_compliance
+    normal:
+      - digital_assets_research
+      - financial_data_analysis
+      - risk_fraud_compliance
+      - technical_operations
+      - banking_operations
+    broad:
+      - digital_assets_research
+      - financial_data_analysis
+      - risk_fraud_compliance
+      - technical_operations
+      - banking_operations
+      - ai_data_governance
+    backfill:
+      - digital_assets_research
+      - financial_data_analysis
+      - risk_fraud_compliance
+      - technical_operations
+      - banking_operations
+      - ai_data_governance
+  max_terms_per_family:
+    strict: 8
+    normal: 9
+    broad: 11
+    backfill: 11
+  max_role_families_per_run:
+    strict: 3
+    normal: 5
+    broad: 6
+    backfill: 6
+
+families:
+  digital_assets_research:
+    search_terms:
+      - Digital Assets Analyst
+      - Blockchain Analytics Analyst
+      - DeFi Analyst
+      - Tokenomics Analyst
+      - Market Intelligence Analyst
+      - Crypto Research Analyst
+      - Web3 Research Analyst
+      - Blockchain Research Analyst
+      - Digital Assets Research Analyst
+      - On-chain Data Analyst
+    purpose: Keep the original digital-assets direction, but avoid making it the only source of high-fit roles.
+
+  financial_data_analysis:
+    search_terms:
+      - Market Data Analyst
+      - Investment Data Analyst
+      - Financial Data Analyst
+      - Research Analyst
+      - Product Analyst
+      - Business Analyst
+      - Strategy Analyst
+      - Capital Markets Analyst
+      - Data Analyst Capital Markets
+      - Banking Data Analyst
+      - Financial Reporting Analyst
+    purpose: Broaden into finance/data analyst roles where SQL, Python, reporting, dashboards, and market knowledge matter.
+
+  risk_fraud_compliance:
+    search_terms:
+      - Fraud Analyst
+      - AML Analyst
+      - KYC Analyst
+      - Compliance Analyst
+      - Financial Crime Analyst
+      - Transaction Monitoring Analyst
+      - Risk Operations Analyst
+      - Trust and Safety Analyst
+      - Fraud Operations Analyst
+      - Crypto Fraud Analyst
+      - Blockchain Investigations Analyst
+      - Payments Risk Analyst
+    purpose: Capture realistic early-career roles where Excel/SQL, case review, pattern detection, risk controls, transaction monitoring, and compliance awareness are valuable.
+
+  technical_operations:
+    search_terms:
+      - Technical Operations Analyst
+      - API Support Analyst
+      - Implementation Analyst
+      - Platform Operations Analyst
+      - Application Support Analyst
+      - Client Integration Analyst
+      - Technical Business Analyst
+      - Solutions Analyst
+      - Product Support Analyst
+      - Data Operations Analyst
+      - Integration Analyst
+    purpose: Capture roles that require practical technical ability but not senior software engineering experience.
+
+  banking_operations:
+    search_terms:
+      - Operations Analyst
+      - Payments Operations Analyst
+      - Treasury Analyst
+      - Capital Markets Operations Analyst
+      - Trade Support Analyst
+      - Reconciliation Analyst
+      - Brokerage Operations Analyst
+      - Securities Operations Analyst
+      - Middle Office Analyst
+      - Investment Operations Analyst
+      - Client Operations Analyst
+    purpose: Capture traditional finance and banking operations roles with realistic entry-level or early-career requirements.
+
+  ai_data_governance:
+    search_terms:
+      - Data Governance Analyst
+      - Regulatory Reporting Analyst
+      - Model Risk Analyst
+      - AI Governance Analyst
+      - Controls Analyst
+      - Process Improvement Analyst
+      - Automation Analyst
+      - Reporting Analyst
+      - Business Process Analyst
+      - Data Quality Analyst
+      - Workflow Automation Analyst
+    purpose: Capture the AI/data governance and automation-adjacent roles that are likely to grow in finance and operations.

@@ -1,0 +1,162 @@
+campaign:
+  daily_targets:
+    deep_tailor: 5
+    standard_tailor: 12
+    quick_apply: 25
+    hold: 0
+
+  estimated_minutes:
+    deep_tailor: 25
+    standard_tailor: 10
+    quick_apply: 4
+    hold: 0
+    skip: 0
+
+  score_thresholds:
+    deep_tailor: 70
+    standard_tailor: 55
+    quick_apply: 35
+    hold: 25
+
+  company_priority:
+    tier_1:
+      - RBC
+      - TD
+      - BMO
+      - CIBC
+      - Scotiabank
+      - Capital One
+      - Wealthsimple
+      - TMX Group
+      - HKEX
+      - DBS
+      - OCBC
+      - UOB
+      - JPMorgan
+      - Goldman Sachs
+      - BlackRock
+      - Morgan Stanley
+      - Citi
+      - HSBC
+      - Standard Chartered
+    crypto_fintech_priority:
+      - OKX
+      - Binance
+      - Coinbase
+      - Crypto.com
+      - HashKey
+      - OSL
+      - GSR
+      - Wintermute
+      - Chainalysis
+      - Fireblocks
+      - Stripe
+      - Wise
+      - Revolut
+
+  max_per_company_per_day: 3
+  max_same_title_per_day: 5
+  exclude_if_already_applied: true
+  exclude_if_status:
+    - applied
+    - interview
+    - rejected
+    - skipped
+    - archived
+
+  auto_generate_resume:
+    deep_tailor: false
+    standard_tailor: false
+    quick_apply: false
+    hold: false
+    skip: false
+
+  allow_manual_generate_resume:
+    deep_tailor: true
+    standard_tailor: true
+    quick_apply: false
+    hold: false
+    skip: false
+
+  auto_generate_answer_pack:
+    deep_tailor: false
+    standard_tailor: false
+    quick_apply: false
+    hold: false
+    skip: false
+
+  allow_manual_generate_answer_pack:
+    deep_tailor: true
+    standard_tailor: true
+    quick_apply: false
+    hold: false
+    skip: false
+
+  auto_generate_cover_letter:
+    deep_tailor: false
+    standard_tailor: false
+    quick_apply: false
+    hold: false
+    skip: false
+
+  allow_manual_generate_cover_letter:
+    deep_tailor: true
+    standard_tailor: true
+    quick_apply: false
+    hold: false
+    skip: false
+
+  quick_apply_requires_existing_profile_resume: true
+
+resume_profiles:
+  data_market_data:
+    keywords:
+      - data analyst
+      - market data
+      - reporting
+      - sql
+      - python
+      - data quality
+      - dashboard
+      - investment data
+      - reference data
+  risk_operations:
+    keywords:
+      - risk analyst
+      - risk operations
+      - credit risk
+      - operational risk
+      - controls
+      - reconciliation
+      - reporting
+      - excel
+  trading_operations:
+    keywords:
+      - trading operations
+      - trade support
+      - market operations
+      - middle office
+      - settlements
+      - reconciliation
+      - brokerage operations
+      - exchange operations
+  api_technical_operations:
+    keywords:
+      - api support
+      - api integration
+      - technical operations
+      - implementation analyst
+      - platform support
+      - application support
+      - rest api
+      - client integration
+  capital_markets_business:
+    keywords:
+      - capital markets
+      - business analyst
+      - treasury
+      - product analyst
+      - onboarding
+      - banking operations
+      - financial operations
+      - payments

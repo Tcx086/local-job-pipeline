@@ -1,0 +1,72 @@
+{
+  "weights": {
+    "role_fit": 30,
+    "skill_match": 25,
+    "location_fit": 15,
+    "seniority_fit": 15,
+    "visa_work_authorization_fit": 10,
+    "industry_fit": 5
+  },
+  "penalties": {
+    "senior_lead_principal": -30,
+    "five_plus_years_required": -25,
+    "phd_required": -30,
+    "requires_pr_or_citizenship": -40,
+    "pure_quant_research_or_quant_trader": -20,
+    "low_latency_cpp": -25,
+    "no_description": -10,
+    "suspicious_staffing_commission_unpaid": -30
+  },
+  "recommendations": {
+    "85": "Must apply",
+    "70": "Strong apply",
+    "55": "Maybe apply",
+    "0": "Skip"
+  },
+  "positive_role_keywords": [
+    "Trading Operations Analyst",
+    "Trading Support Analyst",
+    "Technical Operations Analyst",
+    "Market Data Analyst",
+    "Data Analyst",
+    "Risk Analyst",
+    "Risk Operations Analyst",
+    "Capital Markets Analyst",
+    "Business Analyst",
+    "Product Analyst",
+    "Implementation Analyst",
+    "API Integration Analyst",
+    "API Support Analyst",
+    "Junior Data Engineer",
+    "Data Operations Analyst",
+    "FinTech Analyst",
+    "Crypto Operations Analyst",
+    "Exchange Operations Analyst",
+    "Liquidity Operations Analyst",
+    "Reconciliation Analyst",
+    "Trade Support",
+    "Market Operations",
+    "Securities Operations",
+    "Portfolio Analytics Analyst",
+    "Investment Data Analyst",
+    "Treasury Analyst",
+    "Model Risk Analyst",
+    "Credit Risk Analyst"
+  ],
+  "negative_keywords": [
+    "Senior",
+    "Staff",
+    "Principal",
+    "Lead",
+    "PhD required",
+    "5+ years required",
+    "7+ years required",
+    "7+ years preferred",
+    "Low latency C++",
+    "HFT C++ engineer",
+    "Pure Quant Researcher",
+    "Requires Canadian citizenship",
+    "Requires PR only",
+    "Security clearance"
+  ]
+}

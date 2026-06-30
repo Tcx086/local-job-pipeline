@@ -6,6 +6,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from .query_expander import role_family_for_query
 from .utils import REPORTS_DIR, normalize_space, read_csv, today_yyyymmdd, write_csv
 
 COVERAGE_FIELDS = [
@@ -15,6 +16,7 @@ COVERAGE_FIELDS = [
     "mode",
     "country",
     "source",
+    "role_family",
     "query",
     "location",
     "raw_count",
@@ -44,21 +46,29 @@ COUNT_FIELDS = [
     "error_count",
 ]
 
+CoverageKey = tuple[str, str, str, str, str]
 
-def _key(job: dict[str, Any]) -> tuple[str, str, str, str]:
+
+def _family(value: Any, query: Any = "") -> str:
+    return normalize_space(value or role_family_for_query(str(query or "")) or "unknown") or "unknown"
+
+
+def _key(job: dict[str, Any]) -> CoverageKey:
     country = normalize_space(job.get("detected_country") or job.get("country") or "unknown") or "unknown"
     source = normalize_space(job.get("source") or "unknown") or "unknown"
     query = normalize_space(job.get("search_term_used") or job.get("ats_company_token") or job.get("query") or "active_public_postings")
     location = normalize_space(job.get("search_location_used") or job.get("location") or "all_active")
-    return country, source, query or "unknown", location or "unknown"
+    role_family = _family(job.get("role_family"), query)
+    return country, source, role_family, query or "unknown", location or "unknown"
 
 
-def _attempt_key(attempt: dict[str, Any]) -> tuple[str, str, str, str]:
+def _attempt_key(attempt: dict[str, Any]) -> CoverageKey:
     country = normalize_space(attempt.get("country") or "unknown") or "unknown"
     source = normalize_space(attempt.get("source") or "unknown") or "unknown"
     query = normalize_space(attempt.get("query") or "unknown") or "unknown"
     location = normalize_space(attempt.get("location") or "unknown") or "unknown"
-    return country, source, query, location
+    role_family = _family(attempt.get("role_family"), query)
+    return country, source, role_family, query, location
 
 
 def _truthy(value: Any) -> bool:
@@ -79,9 +89,9 @@ def _base_row(
     run_started_at: str,
     run_finished_at: str,
     mode: str,
-    key: tuple[str, str, str, str],
+    key: CoverageKey,
 ) -> dict[str, Any]:
-    country, source, query, location = key
+    country, source, role_family, query, location = key
     row = {
         "run_id": run_id,
         "run_started_at": run_started_at,
@@ -89,6 +99,7 @@ def _base_row(
         "mode": mode,
         "country": country,
         "source": source,
+        "role_family": role_family,
         "query": query,
         "location": location,
         "average_score": "",
@@ -114,12 +125,12 @@ def build_coverage_rows(
     errors: list[dict[str, Any]] | None = None,
     query_attempts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    rows: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-    score_buckets: dict[tuple[str, str, str, str], list[int]] = defaultdict(list)
-    attempt_keys: set[tuple[str, str, str, str]] = set()
-    recorded_attempt_errors: dict[tuple[tuple[str, str, str, str], str], int] = defaultdict(int)
+    rows: dict[CoverageKey, dict[str, Any]] = {}
+    score_buckets: dict[CoverageKey, list[int]] = defaultdict(list)
+    attempt_keys: set[CoverageKey] = set()
+    recorded_attempt_errors: dict[tuple[CoverageKey, str], int] = defaultdict(int)
 
-    def row_for_key(key: tuple[str, str, str, str]) -> dict[str, Any]:
+    def row_for_key(key: CoverageKey) -> dict[str, Any]:
         if key not in rows:
             rows[key] = _base_row(
                 run_id=run_id,
@@ -186,7 +197,7 @@ def build_coverage_rows(
         if scores:
             rows[key]["average_score"] = round(mean(scores), 1)
 
-    return sorted(rows.values(), key=lambda row: (row["country"], row["source"], row["query"], row["location"]))
+    return sorted(rows.values(), key=lambda row: (row["country"], row["source"], row["role_family"], row["query"], row["location"]))
 
 
 def _write_xlsx(path: Path, rows: list[dict[str, Any]]) -> bool:
@@ -215,12 +226,17 @@ def write_markdown_summary(path: Path, rows: list[dict[str, Any]]) -> None:
     source_totals: dict[str, int] = defaultdict(int)
     high_by_source: dict[str, int] = defaultdict(int)
     high_by_query: dict[str, int] = defaultdict(int)
+    high_by_family: dict[str, int] = defaultdict(int)
+    raw_by_family: dict[str, int] = defaultdict(int)
     for row in rows:
         source = str(row.get("source") or "unknown")
         query = str(row.get("query") or "unknown")
+        family = str(row.get("role_family") or "unknown")
         source_totals[source] += int(row.get("raw_count") or 0)
+        raw_by_family[family] += int(row.get("raw_count") or 0)
         high_by_source[source] += int(row.get("high_score_count_70") or 0)
         high_by_query[query] += int(row.get("high_score_count_70") or 0)
+        high_by_family[family] += int(row.get("high_score_count_70") or 0)
 
     zero_sources = [source for source, total in sorted(source_totals.items()) if total == 0]
     zero_queries = sorted({str(row.get("query")) for row in rows if int(row.get("raw_count") or 0) == 0})
@@ -248,6 +264,10 @@ def write_markdown_summary(path: Path, rows: list[dict[str, Any]]) -> None:
     ]:
         lines.append(f"- {label}: {_sum(rows, field)}")
     lines.append("")
+    lines.append("## Role Family Coverage")
+    for family, total in sorted(raw_by_family.items(), key=lambda item: (-item[1], item[0])):
+        lines.append(f"- {family}: raw={total}, score>=70={high_by_family.get(family, 0)}")
+    lines.append("")
     lines.append("## Diagnostic Answers")
     lines.append(f"- Sources returning no raw jobs: {', '.join(zero_sources) if zero_sources else 'none detected'}")
     lines.append(f"- Zero-result queries: {', '.join(zero_queries[:30]) if zero_queries else 'none detected'}")
@@ -258,6 +278,8 @@ def write_markdown_summary(path: Path, rows: list[dict[str, Any]]) -> None:
     lines.append(f"- Report visibility: report_count={report_count}; All Jobs should be checked before assuming only top jobs exist.")
     top_sources = sorted(high_by_source.items(), key=lambda item: item[1], reverse=True)[:10]
     top_queries = sorted(high_by_query.items(), key=lambda item: item[1], reverse=True)[:10]
+    top_families = sorted(high_by_family.items(), key=lambda item: item[1], reverse=True)[:10]
+    lines.append(f"- Top high-score role families: {', '.join(f'{k} ({v})' for k, v in top_families if v) or 'none yet'}")
     lines.append(f"- Top high-score sources: {', '.join(f'{k} ({v})' for k, v in top_sources if v) or 'none yet'}")
     lines.append(f"- Top high-score queries: {', '.join(f'{k} ({v})' for k, v in top_queries if v) or 'none yet'}")
     lines.append(f"- Error sources: {', '.join(error_sources) if error_sources else 'none detected'}")

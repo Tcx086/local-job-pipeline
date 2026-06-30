@@ -7,13 +7,14 @@ from typing import Any
 
 from .dedupe import canonicalize_job, description_hash, job_fingerprint, jobs_are_same, source_rank
 from .freshness import enrich_freshness, iso_or_blank
-from .utils import DATA_DIR, list_to_cell, now_utc_iso, normalize_space, stable_id
+from .utils import list_to_cell, now_utc_iso, normalize_space, stable_id
+from .workspace import PathRegistry
 
-DEFAULT_DB = DATA_DIR / "job_pipeline.sqlite"
+DEFAULT_DB = PathRegistry.from_project_root().effective_db_path()
 
 JOB_COLUMNS = [
     "canonical_job_id", "source", "source_job_id", "ats_company_token", "title", "normalized_title",
-    "company", "canonical_company", "location", "country", "remote_type", "role_category", "seniority",
+    "company", "canonical_company", "location", "country", "remote_type", "role_category", "role_family", "fit_category", "seniority",
     "job_url", "apply_url", "description", "description_hash", "salary_min", "salary_max", "currency",
     "posted_at", "first_seen_at", "last_seen_at", "is_active", "score", "recommendation",
     "matched_keywords", "missing_keywords", "red_flags", "reason_to_apply", "resume_file_generated", "scheduler_resume_draft_path",
@@ -109,7 +110,15 @@ def init_db(conn: sqlite3.Connection) -> None:
             next_action_date TEXT,
             interview_date TEXT,
             rejection_date TEXT,
-            company_response TEXT
+            company_response TEXT,
+            application_workspace_path TEXT,
+            resume_pdf_path TEXT,
+            resume_docx_path TEXT,
+            cover_letter_pdf_path TEXT,
+            cover_letter_docx_path TEXT,
+            cover_letter_body_path TEXT,
+            answer_pack_path TEXT,
+            job_description_path TEXT
         );
 
         CREATE TABLE IF NOT EXISTS companies (
@@ -186,21 +195,32 @@ def init_db(conn: sqlite3.Connection) -> None:
             application_effort TEXT,
             campaign_priority INTEGER,
             campaign_reason TEXT,
+            campaign_score INTEGER,
+            campaign_score_band TEXT,
+            campaign_job_updated_at TEXT,
             resume_profile TEXT,
             profile_resume_path TEXT,
             tailored_resume_path TEXT,
             answer_pack_path TEXT,
+            cover_letter_path TEXT,
             estimated_minutes INTEGER,
             auto_generate_resume INTEGER DEFAULT 0,
             allow_manual_generate_resume INTEGER DEFAULT 0,
             auto_generate_answer_pack INTEGER DEFAULT 0,
             allow_manual_generate_answer_pack INTEGER DEFAULT 0,
+            auto_generate_cover_letter INTEGER DEFAULT 0,
+            allow_manual_generate_cover_letter INTEGER DEFAULT 0,
             should_generate_resume INTEGER DEFAULT 0,
             should_generate_answer_pack INTEGER DEFAULT 0,
+            should_generate_cover_letter INTEGER DEFAULT 0,
             campaign_status TEXT,
             selected_at TEXT,
             completed_at TEXT,
             notes TEXT,
+            application_workspace_path TEXT,
+            resume_pdf_path TEXT,
+            cover_letter_pdf_path TEXT,
+            cover_letter_body_path TEXT,
             UNIQUE(campaign_date, canonical_job_id)
         );
         CREATE TABLE IF NOT EXISTS job_merge_events (
@@ -239,6 +259,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     _ensure_job_columns(conn)
     _ensure_application_columns(conn)
     _ensure_campaign_item_columns(conn)
+    _ensure_search_coverage_columns(conn)
     conn.commit()
 
 
@@ -246,10 +267,20 @@ APPLICATION_EXTRA_COLUMNS = {
     "apply_url": "TEXT",
     "confirmation_number": "TEXT",
     "confirmation_snippet": "TEXT",
+    "application_workspace_path": "TEXT",
+    "resume_pdf_path": "TEXT",
+    "resume_docx_path": "TEXT",
+    "cover_letter_pdf_path": "TEXT",
+    "cover_letter_docx_path": "TEXT",
+    "cover_letter_body_path": "TEXT",
+    "answer_pack_path": "TEXT",
+    "job_description_path": "TEXT",
 }
 
 
 JOB_EXTRA_COLUMNS = {
+    "role_family": "TEXT",
+    "fit_category": "TEXT",
     "scheduler_resume_draft_path": "TEXT",
     "search_term_used": "TEXT",
     "hard_skip": "INTEGER DEFAULT 0",
@@ -262,6 +293,7 @@ JOB_EXTRA_COLUMNS = {
     "profile_resume_path": "TEXT",
     "tailored_resume_path": "TEXT",
     "answer_pack_path": "TEXT",
+    "cover_letter_path": "TEXT",
     "campaign_priority": "INTEGER",
     "campaign_reason": "TEXT",
     "estimated_minutes": "INTEGER DEFAULT 0",
@@ -269,28 +301,65 @@ JOB_EXTRA_COLUMNS = {
     "allow_manual_generate_resume": "INTEGER DEFAULT 0",
     "auto_generate_answer_pack": "INTEGER DEFAULT 0",
     "allow_manual_generate_answer_pack": "INTEGER DEFAULT 0",
+    "auto_generate_cover_letter": "INTEGER DEFAULT 0",
+    "allow_manual_generate_cover_letter": "INTEGER DEFAULT 0",
     "should_generate_resume": "INTEGER DEFAULT 0",
     "should_generate_answer_pack": "INTEGER DEFAULT 0",
+    "should_generate_cover_letter": "INTEGER DEFAULT 0",
     "campaign_date": "TEXT",
     "campaign_status": "TEXT",
+    "application_workspace_path": "TEXT",
+    "latest_resume_pdf_path": "TEXT",
+    "latest_cover_letter_pdf_path": "TEXT",
+    "latest_answer_pack_path": "TEXT",
 }
 
 CAMPAIGN_ITEM_COLUMNS = [
     "campaign_date", "canonical_job_id", "application_effort", "campaign_priority", "campaign_reason",
-    "resume_profile", "profile_resume_path", "tailored_resume_path", "answer_pack_path",
+    "campaign_score", "campaign_score_band", "campaign_job_updated_at",
+    "resume_profile", "profile_resume_path", "tailored_resume_path", "answer_pack_path", "cover_letter_path",
+    "application_workspace_path", "resume_pdf_path", "cover_letter_pdf_path", "cover_letter_body_path",
     "estimated_minutes", "auto_generate_resume", "allow_manual_generate_resume",
     "auto_generate_answer_pack", "allow_manual_generate_answer_pack",
-    "should_generate_resume", "should_generate_answer_pack", "campaign_status",
+    "auto_generate_cover_letter", "allow_manual_generate_cover_letter",
+    "should_generate_resume", "should_generate_answer_pack", "should_generate_cover_letter", "campaign_status",
     "selected_at", "completed_at", "notes",
 ]
 
 CAMPAIGN_ITEM_EXTRA_COLUMNS = {
+    "application_effort": "TEXT",
+    "campaign_priority": "INTEGER",
+    "campaign_reason": "TEXT",
+    "campaign_score": "INTEGER",
+    "campaign_score_band": "TEXT",
+    "campaign_job_updated_at": "TEXT",
+    "resume_profile": "TEXT",
+    "profile_resume_path": "TEXT",
+    "tailored_resume_path": "TEXT",
+    "answer_pack_path": "TEXT",
+    "cover_letter_path": "TEXT",
+    "application_workspace_path": "TEXT",
+    "resume_pdf_path": "TEXT",
+    "cover_letter_pdf_path": "TEXT",
+    "cover_letter_body_path": "TEXT",
+    "estimated_minutes": "INTEGER DEFAULT 0",
     "auto_generate_resume": "INTEGER DEFAULT 0",
     "allow_manual_generate_resume": "INTEGER DEFAULT 0",
     "auto_generate_answer_pack": "INTEGER DEFAULT 0",
     "allow_manual_generate_answer_pack": "INTEGER DEFAULT 0",
+    "auto_generate_cover_letter": "INTEGER DEFAULT 0",
+    "allow_manual_generate_cover_letter": "INTEGER DEFAULT 0",
     "should_generate_resume": "INTEGER DEFAULT 0",
     "should_generate_answer_pack": "INTEGER DEFAULT 0",
+    "should_generate_cover_letter": "INTEGER DEFAULT 0",
+    "campaign_status": "TEXT",
+    "selected_at": "TEXT",
+    "completed_at": "TEXT",
+    "notes": "TEXT",
+}
+
+SEARCH_COVERAGE_EXTRA_COLUMNS = {
+    "role_family": "TEXT",
 }
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -317,6 +386,12 @@ def _ensure_campaign_item_columns(conn: sqlite3.Connection) -> None:
         if column not in existing:
             conn.execute(f"ALTER TABLE campaign_items ADD COLUMN {column} {column_type}")
 
+def _ensure_search_coverage_columns(conn: sqlite3.Connection) -> None:
+    existing = _table_columns(conn, "search_coverage")
+    for column, column_type in SEARCH_COVERAGE_EXTRA_COLUMNS.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE search_coverage ADD COLUMN {column} {column_type}")
+
 def _json_cell(value: Any) -> str:
     if value is None:
         return ""
@@ -340,19 +415,37 @@ def _parse_cell(value: Any) -> Any:
 
 def _row_to_job(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     data = dict(row)
+    data["application_workspace_path"] = _first_text(data.get("application_workspace_path"), data.get("application_application_workspace_path"), data.get("job_application_workspace_path"))
+    data["resume_pdf_path"] = _first_text(data.get("resume_pdf_path"), data.get("application_resume_pdf_path"), data.get("job_latest_resume_pdf_path"))
+    data["cover_letter_pdf_path"] = _first_text(data.get("cover_letter_pdf_path"), data.get("application_cover_letter_pdf_path"), data.get("job_latest_cover_letter_pdf_path"))
+    data["cover_letter_body_path"] = _first_text(data.get("cover_letter_body_path"), data.get("application_cover_letter_body_path"))
+    data["answer_pack_path"] = _first_text(data.get("answer_pack_path"), data.get("application_answer_pack_path"), data.get("job_latest_answer_pack_path"))
     for key in ["matched_keywords", "missing_keywords", "red_flags", "soft_penalties", "all_sources", "all_source_urls"]:
         data[key] = _parse_cell(data.get(key)) or []
     data["hard_skip"] = bool(data.get("hard_skip"))
     return data
 
+
+def _has_score_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return normalize_space(value) != ""
+    return True
+
+
 def prepare_job_for_db(job: dict[str, Any], now: str | None = None) -> dict[str, Any]:
     now = now or now_utc_iso()
+    incoming_has_score = _has_score_value(job.get("score"))
     row = canonicalize_job(job)
+    row["_incoming_has_score"] = incoming_has_score
     row["canonical_job_id"] = row.get("canonical_job_id") or stable_id(
         row.get("canonical_company"), row.get("normalized_title"), row.get("normalized_location")
     )
     row["source_job_id"] = normalize_space(row.get("source_job_id") or row.get("job_id"))
     row["country"] = row.get("detected_country") or row.get("country") or ""
+    row["role_family"] = normalize_space(row.get("role_family") or "")
+    row["fit_category"] = normalize_space(row.get("fit_category") or "")
     row["posted_at"] = iso_or_blank(row.get("posted_at") or row.get("date_posted"))
     row["description_hash"] = row.get("description_hash") or description_hash(row.get("description"))
     row["first_seen_at"] = row.get("first_seen_at") or now
@@ -415,13 +508,30 @@ def _choose_primary(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[
     for key, value in fallback.items():
         if merged.get(key) in (None, "", []):
             merged[key] = value
-    incoming_has_score = incoming.get("score") not in (None, "")
-    if incoming_has_score:
+    scoring_fields = [
+        "recommendation",
+        "role_family",
+        "fit_category",
+        "matched_keywords",
+        "missing_keywords",
+        "red_flags",
+        "reason_to_apply",
+        "hard_skip",
+        "soft_penalties",
+        "filter_reason",
+    ]
+    resume_fields = ["resume_file_generated", "scheduler_resume_draft_path"]
+    if incoming.get("_incoming_has_score"):
         merged["score"] = int(incoming.get("score") or 0)
-        for key in ["recommendation", "matched_keywords", "missing_keywords", "red_flags", "reason_to_apply", "resume_file_generated", "scheduler_resume_draft_path", "hard_skip", "soft_penalties", "filter_reason"]:
+        for key in scoring_fields:
             merged[key] = incoming.get(key, merged.get(key))
+        for key in resume_fields:
+            if incoming.get(key) not in (None, "", []):
+                merged[key] = incoming.get(key)
     else:
         merged["score"] = int(existing.get("score") or 0)
+        for key in [*scoring_fields, *resume_fields]:
+            merged[key] = existing.get(key, merged.get(key))
     return merged
 
 
@@ -550,6 +660,33 @@ def upsert_jobs(db_path: Path, jobs: list[dict[str, Any]], raw_json_path: str = 
     return rows, new_rows
 
 
+APPLICATION_UPDATE_FIELDS = [
+    "status",
+    "status_updated_at",
+    "applied_at",
+    "resume_used",
+    "cover_letter_used",
+    "account_used",
+    "apply_url",
+    "confirmation_number",
+    "confirmation_snippet",
+    "notes",
+    "next_action",
+    "next_action_date",
+    "interview_date",
+    "rejection_date",
+    "company_response",
+    "application_workspace_path",
+    "resume_pdf_path",
+    "resume_docx_path",
+    "cover_letter_pdf_path",
+    "cover_letter_docx_path",
+    "cover_letter_body_path",
+    "answer_pack_path",
+    "job_description_path",
+]
+
+
 def update_application(
     canonical_job_id: str,
     *,
@@ -567,6 +704,14 @@ def update_application(
     interview_date: str | None = None,
     rejection_date: str | None = None,
     company_response: str | None = None,
+    application_workspace_path: str | None = None,
+    resume_pdf_path: str | None = None,
+    resume_docx_path: str | None = None,
+    cover_letter_pdf_path: str | None = None,
+    cover_letter_docx_path: str | None = None,
+    cover_letter_body_path: str | None = None,
+    answer_pack_path: str | None = None,
+    job_description_path: str | None = None,
     db_path: Path = DEFAULT_DB,
 ) -> None:
     now = now_utc_iso()
@@ -590,34 +735,61 @@ def update_application(
             "interview_date": interview_date if interview_date is not None else current.get("interview_date", ""),
             "rejection_date": rejection_date if rejection_date is not None else current.get("rejection_date", ""),
             "company_response": company_response if company_response is not None else current.get("company_response", ""),
+            "application_workspace_path": application_workspace_path if application_workspace_path is not None else current.get("application_workspace_path", ""),
+            "resume_pdf_path": resume_pdf_path if resume_pdf_path is not None else current.get("resume_pdf_path", ""),
+            "resume_docx_path": resume_docx_path if resume_docx_path is not None else current.get("resume_docx_path", ""),
+            "cover_letter_pdf_path": cover_letter_pdf_path if cover_letter_pdf_path is not None else current.get("cover_letter_pdf_path", ""),
+            "cover_letter_docx_path": cover_letter_docx_path if cover_letter_docx_path is not None else current.get("cover_letter_docx_path", ""),
+            "cover_letter_body_path": cover_letter_body_path if cover_letter_body_path is not None else current.get("cover_letter_body_path", ""),
+            "answer_pack_path": answer_pack_path if answer_pack_path is not None else current.get("answer_pack_path", ""),
+            "job_description_path": job_description_path if job_description_path is not None else current.get("job_description_path", ""),
         }
+        columns = ["canonical_job_id", *APPLICATION_UPDATE_FIELDS]
+        placeholders = ", ".join(":" + column for column in columns)
+        assignments = ",\n                ".join(f"{column}=excluded.{column}" for column in APPLICATION_UPDATE_FIELDS)
         conn.execute(
-            """
-            INSERT INTO applications (canonical_job_id, status, status_updated_at, applied_at, resume_used, cover_letter_used, account_used, apply_url, confirmation_number, confirmation_snippet, notes, next_action, next_action_date, interview_date, rejection_date, company_response)
-            VALUES (:canonical_job_id, :status, :status_updated_at, :applied_at, :resume_used, :cover_letter_used, :account_used, :apply_url, :confirmation_number, :confirmation_snippet, :notes, :next_action, :next_action_date, :interview_date, :rejection_date, :company_response)
+            f"""
+            INSERT INTO applications ({', '.join(columns)})
+            VALUES ({placeholders})
             ON CONFLICT(canonical_job_id) DO UPDATE SET
-                status=excluded.status,
-                status_updated_at=excluded.status_updated_at,
-                applied_at=excluded.applied_at,
-                resume_used=excluded.resume_used,
-                cover_letter_used=excluded.cover_letter_used,
-                account_used=excluded.account_used,
-                apply_url=excluded.apply_url,
-                confirmation_number=excluded.confirmation_number,
-                confirmation_snippet=excluded.confirmation_snippet,
-                notes=excluded.notes,
-                next_action=excluded.next_action,
-                next_action_date=excluded.next_action_date,
-                interview_date=excluded.interview_date,
-                rejection_date=excluded.rejection_date,
-                company_response=excluded.company_response
+                {assignments}
             """,
             {"canonical_job_id": canonical_job_id, **updates},
         )
+        job_updates = {
+            "canonical_job_id": canonical_job_id,
+            "application_workspace_path": updates.get("application_workspace_path") or "",
+            "latest_resume_pdf_path": updates.get("resume_pdf_path") or "",
+            "latest_cover_letter_pdf_path": updates.get("cover_letter_pdf_path") or "",
+            "latest_answer_pack_path": updates.get("answer_pack_path") or "",
+        }
+        job_updates = {key: value for key, value in job_updates.items() if key == "canonical_job_id" or value}
+        if len(job_updates) > 1:
+            job_assignments = ", ".join(f"{column} = :{column}" for column in job_updates if column != "canonical_job_id")
+            conn.execute(f"UPDATE jobs SET {job_assignments} WHERE canonical_job_id = :canonical_job_id", job_updates)
         conn.commit()
     finally:
         conn.close()
 
+
+def _first_text(*values: Any) -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _merge_application_artifact_fields(data: dict[str, Any]) -> dict[str, Any]:
+    data["application_workspace_path"] = _first_text(data.get("application_application_workspace_path"), data.get("application_workspace_path"))
+    data["resume_pdf_path"] = _first_text(data.get("application_resume_pdf_path"), data.get("resume_pdf_path"), data.get("latest_resume_pdf_path"))
+    data["resume_docx_path"] = _first_text(data.get("application_resume_docx_path"), data.get("resume_docx_path"))
+    data["cover_letter_pdf_path"] = _first_text(data.get("application_cover_letter_pdf_path"), data.get("cover_letter_pdf_path"), data.get("latest_cover_letter_pdf_path"))
+    data["cover_letter_docx_path"] = _first_text(data.get("application_cover_letter_docx_path"), data.get("cover_letter_docx_path"))
+    data["cover_letter_body_path"] = _first_text(data.get("application_cover_letter_body_path"), data.get("cover_letter_body_path"))
+    data["answer_pack_path"] = _first_text(data.get("application_answer_pack_path"), data.get("answer_pack_path"), data.get("latest_answer_pack_path"))
+    data["job_description_path"] = _first_text(data.get("application_job_description_path"), data.get("job_description_path"))
+    return data
 
 def get_jobs(db_path: Path = DEFAULT_DB, include_inactive: bool = True) -> list[dict[str, Any]]:
     conn = connect(db_path)
@@ -625,14 +797,22 @@ def get_jobs(db_path: Path = DEFAULT_DB, include_inactive: bool = True) -> list[
         sql = """
             SELECT j.*, COALESCE(a.status, 'new') AS status, a.next_action, a.next_action_date, a.applied_at,
                    a.resume_used, a.apply_url AS application_apply_url, a.confirmation_number,
-                   a.confirmation_snippet, a.notes, a.interview_date, a.rejection_date, a.company_response
+                   a.confirmation_snippet, a.notes, a.interview_date, a.rejection_date, a.company_response,
+                   a.application_workspace_path AS application_application_workspace_path,
+                   a.resume_pdf_path AS application_resume_pdf_path,
+                   a.resume_docx_path AS application_resume_docx_path,
+                   a.cover_letter_pdf_path AS application_cover_letter_pdf_path,
+                   a.cover_letter_docx_path AS application_cover_letter_docx_path,
+                   a.cover_letter_body_path AS application_cover_letter_body_path,
+                   a.answer_pack_path AS application_answer_pack_path,
+                   a.job_description_path AS application_job_description_path
             FROM jobs j
             LEFT JOIN applications a ON a.canonical_job_id = j.canonical_job_id
         """
         if not include_inactive:
             sql += " WHERE j.is_active = 1"
         sql += " ORDER BY j.is_new_since_last_run DESC, j.score DESC, j.updated_at DESC"
-        return [_row_to_job(row) for row in conn.execute(sql).fetchall()]
+        return [_merge_application_artifact_fields(_row_to_job(row)) for row in conn.execute(sql).fetchall()]
     finally:
         conn.close()
 
@@ -645,7 +825,15 @@ def get_job_detail(canonical_job_id: str, db_path: Path = DEFAULT_DB) -> dict[st
             SELECT j.*, COALESCE(a.status, 'new') AS status, a.next_action, a.next_action_date, a.applied_at,
                    a.resume_used, a.cover_letter_used, a.account_used, a.apply_url AS application_apply_url,
                    a.confirmation_number, a.confirmation_snippet, a.notes, a.interview_date,
-                   a.rejection_date, a.company_response
+                   a.rejection_date, a.company_response,
+                   a.application_workspace_path AS application_application_workspace_path,
+                   a.resume_pdf_path AS application_resume_pdf_path,
+                   a.resume_docx_path AS application_resume_docx_path,
+                   a.cover_letter_pdf_path AS application_cover_letter_pdf_path,
+                   a.cover_letter_docx_path AS application_cover_letter_docx_path,
+                   a.cover_letter_body_path AS application_cover_letter_body_path,
+                   a.answer_pack_path AS application_answer_pack_path,
+                   a.job_description_path AS application_job_description_path
             FROM jobs j
             LEFT JOIN applications a ON a.canonical_job_id = j.canonical_job_id
             WHERE j.canonical_job_id = ?
@@ -654,7 +842,7 @@ def get_job_detail(canonical_job_id: str, db_path: Path = DEFAULT_DB) -> dict[st
         ).fetchone()
         if not row:
             return None
-        detail = _row_to_job(row)
+        detail = _merge_application_artifact_fields(_row_to_job(row))
         detail["snapshots"] = [dict(item) for item in conn.execute("SELECT * FROM job_snapshots WHERE canonical_job_id = ? ORDER BY collected_at DESC", (canonical_job_id,)).fetchall()]
         return detail
     finally:
@@ -671,10 +859,11 @@ def get_applications(db_path: Path = DEFAULT_DB) -> list[dict[str, Any]]:
 
 JOB_CAMPAIGN_SYNC_COLUMNS = [
     "application_effort", "resume_profile", "profile_resume_path", "tailored_resume_path",
-    "answer_pack_path", "campaign_priority", "campaign_reason", "estimated_minutes",
+    "answer_pack_path", "cover_letter_path", "application_workspace_path", "campaign_priority", "campaign_reason", "estimated_minutes",
     "auto_generate_resume", "allow_manual_generate_resume",
     "auto_generate_answer_pack", "allow_manual_generate_answer_pack",
-    "should_generate_resume", "should_generate_answer_pack", "campaign_date", "campaign_status",
+    "auto_generate_cover_letter", "allow_manual_generate_cover_letter",
+    "should_generate_resume", "should_generate_answer_pack", "should_generate_cover_letter", "campaign_date", "campaign_status",
 ]
 
 
@@ -688,8 +877,9 @@ def _int_cell(value: Any) -> int:
 def _campaign_item_values(row: dict[str, Any], now: str) -> dict[str, Any]:
     values = {column: row.get(column, "") for column in CAMPAIGN_ITEM_COLUMNS}
     values["campaign_priority"] = _int_cell(values.get("campaign_priority"))
+    values["campaign_score"] = _int_cell(values.get("campaign_score") if values.get("campaign_score") not in (None, "") else row.get("score"))
     values["estimated_minutes"] = _int_cell(values.get("estimated_minutes"))
-    for flag in ["auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack", "should_generate_resume", "should_generate_answer_pack"]:
+    for flag in ["auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack", "auto_generate_cover_letter", "allow_manual_generate_cover_letter", "should_generate_resume", "should_generate_answer_pack", "should_generate_cover_letter"]:
         values[flag] = int(bool(values.get(flag)))
     values["campaign_status"] = values.get("campaign_status") or "queued"
     values["selected_at"] = values.get("selected_at") or now
@@ -702,11 +892,18 @@ def _sync_campaign_fields_to_job(conn: sqlite3.Connection, row: dict[str, Any]) 
     canonical_job_id = str(row.get("canonical_job_id") or "")
     if not canonical_job_id:
         return
-    values = {column: row.get(column, "") for column in JOB_CAMPAIGN_SYNC_COLUMNS}
+    values = {column: row.get(column, "") for column in JOB_CAMPAIGN_SYNC_COLUMNS if column in row}
+    for target, source in [
+        ("latest_resume_pdf_path", "resume_pdf_path"),
+        ("latest_cover_letter_pdf_path", "cover_letter_pdf_path"),
+        ("latest_answer_pack_path", "answer_pack_path"),
+    ]:
+        if row.get(source):
+            values[target] = row.get(source)
     values["canonical_job_id"] = canonical_job_id
-    assignments = ", ".join(f"{column} = :{column}" for column in JOB_CAMPAIGN_SYNC_COLUMNS)
-    conn.execute(f"UPDATE jobs SET {assignments} WHERE canonical_job_id = :canonical_job_id", values)
-
+    assignments = ", ".join(f"{column} = :{column}" for column in values if column != "canonical_job_id")
+    if assignments:
+        conn.execute(f"UPDATE jobs SET {assignments} WHERE canonical_job_id = :canonical_job_id", values)
 
 def save_campaign_items(db_path: Path, rows: list[dict[str, Any]]) -> None:
     if not rows:
@@ -718,17 +915,28 @@ def save_campaign_items(db_path: Path, rows: list[dict[str, Any]]) -> None:
             "application_effort=excluded.application_effort",
             "campaign_priority=excluded.campaign_priority",
             "campaign_reason=excluded.campaign_reason",
+            "campaign_score=excluded.campaign_score",
+            "campaign_score_band=excluded.campaign_score_band",
+            "campaign_job_updated_at=excluded.campaign_job_updated_at",
             "resume_profile=excluded.resume_profile",
             "profile_resume_path=excluded.profile_resume_path",
             "tailored_resume_path=excluded.tailored_resume_path",
             "answer_pack_path=excluded.answer_pack_path",
+            "cover_letter_path=excluded.cover_letter_path",
+            "application_workspace_path=excluded.application_workspace_path",
+            "resume_pdf_path=excluded.resume_pdf_path",
+            "cover_letter_pdf_path=excluded.cover_letter_pdf_path",
+            "cover_letter_body_path=excluded.cover_letter_body_path",
             "estimated_minutes=excluded.estimated_minutes",
             "auto_generate_resume=excluded.auto_generate_resume",
             "allow_manual_generate_resume=excluded.allow_manual_generate_resume",
             "auto_generate_answer_pack=excluded.auto_generate_answer_pack",
             "allow_manual_generate_answer_pack=excluded.allow_manual_generate_answer_pack",
+            "auto_generate_cover_letter=excluded.auto_generate_cover_letter",
+            "allow_manual_generate_cover_letter=excluded.allow_manual_generate_cover_letter",
             "should_generate_resume=excluded.should_generate_resume",
             "should_generate_answer_pack=excluded.should_generate_answer_pack",
+            "should_generate_cover_letter=excluded.should_generate_cover_letter",
             "campaign_status=CASE WHEN campaign_items.campaign_status IN ('applied', 'skipped') THEN campaign_items.campaign_status ELSE excluded.campaign_status END",
             "selected_at=CASE WHEN campaign_items.selected_at IS NOT NULL AND campaign_items.selected_at != '' THEN campaign_items.selected_at ELSE excluded.selected_at END",
             "completed_at=CASE WHEN campaign_items.completed_at IS NOT NULL AND campaign_items.completed_at != '' THEN campaign_items.completed_at ELSE excluded.completed_at END",
@@ -782,20 +990,49 @@ def replace_campaign_items(db_path: Path, campaign_date: str, rows: list[dict[st
 
 def _campaign_row(row: sqlite3.Row) -> dict[str, Any]:
     data = dict(row)
+    data["application_workspace_path"] = _first_text(data.get("application_workspace_path"), data.get("application_application_workspace_path"), data.get("job_application_workspace_path"))
+    data["resume_pdf_path"] = _first_text(data.get("resume_pdf_path"), data.get("application_resume_pdf_path"), data.get("job_latest_resume_pdf_path"))
+    data["cover_letter_pdf_path"] = _first_text(data.get("cover_letter_pdf_path"), data.get("application_cover_letter_pdf_path"), data.get("job_latest_cover_letter_pdf_path"))
+    data["cover_letter_body_path"] = _first_text(data.get("cover_letter_body_path"), data.get("application_cover_letter_body_path"))
+    data["answer_pack_path"] = _first_text(data.get("answer_pack_path"), data.get("application_answer_pack_path"), data.get("job_latest_answer_pack_path"))
     for key in ["matched_keywords", "missing_keywords", "red_flags", "soft_penalties"]:
         if key in data:
             data[key] = _parse_cell(data.get(key)) or []
     data["hard_skip"] = bool(data.get("hard_skip"))
     new_flags = ["auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack"]
+    cover_flags = ["auto_generate_cover_letter", "allow_manual_generate_cover_letter"]
     legacy_new_flags_empty = not any(data.get(flag) for flag in new_flags)
-    for flag in [*new_flags, "should_generate_resume", "should_generate_answer_pack"]:
+    cover_flags_empty = not any(data.get(flag) for flag in cover_flags)
+    for flag in [*new_flags, *cover_flags, "should_generate_resume", "should_generate_answer_pack", "should_generate_cover_letter"]:
         data[flag] = bool(data.get(flag))
+    effort = str(data.get("application_effort") or "")
     if legacy_new_flags_empty:
-        effort = str(data.get("application_effort") or "")
         data["auto_generate_resume"] = bool(data.get("should_generate_resume"))
         data["auto_generate_answer_pack"] = bool(data.get("should_generate_answer_pack"))
         data["allow_manual_generate_resume"] = effort in {"deep_tailor", "standard_tailor"}
         data["allow_manual_generate_answer_pack"] = effort in {"deep_tailor", "standard_tailor"}
+    if cover_flags_empty:
+        data["auto_generate_cover_letter"] = bool(data.get("should_generate_cover_letter"))
+        data["allow_manual_generate_cover_letter"] = effort in {"deep_tailor", "standard_tailor"}
+    campaign_score = data.get("campaign_score")
+    current_score = data.get("current_score")
+    data["campaign_score"] = int(campaign_score) if campaign_score not in (None, "") else None
+    data["current_score"] = int(current_score) if current_score not in (None, "") else None
+    data["score"] = data["campaign_score"]
+    if not data.get("campaign_score_band") and data.get("score_band"):
+        data["campaign_score_band"] = data.get("score_band")
+    data["score_band"] = data.get("campaign_score_band") or ""
+    for field, current_field in [("role_family", "current_role_family"), ("fit_category", "current_fit_category")]:
+        campaign_value = normalize_space(data.get(field) or "")
+        current_value = normalize_space(data.get(current_field) or "")
+        data[field] = campaign_value or current_value or "unknown"
+    campaign_job_updated_at = str(data.get("campaign_job_updated_at") or "")
+    current_job_updated_at = str(data.get("current_job_updated_at") or "")
+    score_changed = data["campaign_score"] is None or (
+        data["current_score"] is not None and data["current_score"] != data["campaign_score"]
+    )
+    updated_after_campaign = bool(current_job_updated_at and (not campaign_job_updated_at or current_job_updated_at > campaign_job_updated_at))
+    data["campaign_stale"] = bool(score_changed or updated_after_campaign)
     return data
 
 
@@ -804,14 +1041,26 @@ def get_campaign_items(db_path: Path = DEFAULT_DB, campaign_date: str | None = N
     try:
         sql = """
             SELECT ci.*,
-                   j.score, j.recommendation, j.title, j.company, j.canonical_company, j.location, j.country,
-                   j.remote_type, j.role_category, j.seniority, j.job_url, j.apply_url, j.description,
+                   j.score AS current_score, j.updated_at AS current_job_updated_at,
+                   j.recommendation, j.title, j.company, j.canonical_company, j.location, j.country,
+                   j.remote_type, j.role_category, j.role_family AS current_role_family,
+                   j.fit_category AS current_fit_category, j.seniority, j.job_url, j.apply_url, j.description,
                    j.posted_at, j.first_seen_at, j.last_seen_at, j.freshness_label, j.is_new_since_last_run,
                    j.matched_keywords, j.missing_keywords, j.red_flags, j.hard_skip, j.soft_penalties,
                    j.filter_reason, j.reason_to_apply, j.resume_file_generated, j.scheduler_resume_draft_path,
+                   j.application_workspace_path AS job_application_workspace_path,
+                   j.latest_resume_pdf_path AS job_latest_resume_pdf_path,
+                   j.latest_cover_letter_pdf_path AS job_latest_cover_letter_pdf_path,
+                   j.latest_answer_pack_path AS job_latest_answer_pack_path,
                    COALESCE(a.status, 'new') AS application_status,
                    a.applied_at, a.resume_used, a.apply_url AS application_apply_url,
-                   a.confirmation_number, a.confirmation_snippet, a.notes AS application_notes
+                   a.confirmation_number, a.confirmation_snippet, a.notes AS application_notes,
+                   a.cover_letter_used AS application_cover_letter_used,
+                   a.application_workspace_path AS application_application_workspace_path,
+                   a.resume_pdf_path AS application_resume_pdf_path,
+                   a.cover_letter_pdf_path AS application_cover_letter_pdf_path,
+                   a.cover_letter_body_path AS application_cover_letter_body_path,
+                   a.answer_pack_path AS application_answer_pack_path
             FROM campaign_items ci
             JOIN jobs j ON j.canonical_job_id = ci.canonical_job_id
             LEFT JOIN applications a ON a.canonical_job_id = ci.canonical_job_id
@@ -842,6 +1091,11 @@ def update_campaign_item_files(
     profile_resume_path: str | None = None,
     tailored_resume_path: str | None = None,
     answer_pack_path: str | None = None,
+    cover_letter_path: str | None = None,
+    application_workspace_path: str | None = None,
+    resume_pdf_path: str | None = None,
+    cover_letter_pdf_path: str | None = None,
+    cover_letter_body_path: str | None = None,
     db_path: Path = DEFAULT_DB,
 ) -> None:
     updates = {
@@ -850,6 +1104,11 @@ def update_campaign_item_files(
             "profile_resume_path": profile_resume_path,
             "tailored_resume_path": tailored_resume_path,
             "answer_pack_path": answer_pack_path,
+            "cover_letter_path": cover_letter_path,
+            "application_workspace_path": application_workspace_path,
+            "resume_pdf_path": resume_pdf_path,
+            "cover_letter_pdf_path": cover_letter_pdf_path,
+            "cover_letter_body_path": cover_letter_body_path,
         }.items()
         if value is not None
     }
@@ -864,12 +1123,10 @@ def update_campaign_item_files(
             f"UPDATE campaign_items SET {assignments} WHERE campaign_date = :campaign_date AND canonical_job_id = :canonical_job_id",
             updates,
         )
-        job_assignments = ", ".join(f"{column} = :{column}" for column in updates if column not in {"campaign_date", "canonical_job_id"})
-        conn.execute(f"UPDATE jobs SET {job_assignments} WHERE canonical_job_id = :canonical_job_id", updates)
+        _sync_campaign_fields_to_job(conn, updates)
         conn.commit()
     finally:
         conn.close()
-
 
 def update_campaign_item_status(
     campaign_date: str,
@@ -914,7 +1171,13 @@ def update_campaign_item_status(
         row = conn.execute(
             """
             SELECT ci.*, j.apply_url, j.job_url, j.resume_file_generated, j.scheduler_resume_draft_path,
-                   a.apply_url AS application_apply_url
+                   a.apply_url AS application_apply_url,
+                   a.cover_letter_used AS application_cover_letter_used,
+                   a.application_workspace_path AS application_application_workspace_path,
+                   a.resume_pdf_path AS application_resume_pdf_path,
+                   a.cover_letter_pdf_path AS application_cover_letter_pdf_path,
+                   a.cover_letter_body_path AS application_cover_letter_body_path,
+                   a.answer_pack_path AS application_answer_pack_path
             FROM campaign_items ci
             JOIN jobs j ON j.canonical_job_id = ci.canonical_job_id
             LEFT JOIN applications a ON a.canonical_job_id = ci.canonical_job_id
@@ -926,15 +1189,27 @@ def update_campaign_item_status(
     finally:
         conn.close()
     if status == "applied" and row:
-        resume_used = str(row["tailored_resume_path"] or row["profile_resume_path"] or "")
+        application_workspace_path = _first_text(row["application_workspace_path"], row["application_application_workspace_path"])
+        resume_pdf_path = _first_text(row["resume_pdf_path"], row["application_resume_pdf_path"])
+        cover_letter_pdf_path = _first_text(row["cover_letter_pdf_path"], row["application_cover_letter_pdf_path"])
+        cover_letter_body_path = _first_text(row["cover_letter_body_path"], row["application_cover_letter_body_path"])
+        answer_pack_path = _first_text(row["answer_pack_path"], row["application_answer_pack_path"])
+        resume_used = _first_text(resume_pdf_path, row["tailored_resume_path"], row["profile_resume_path"])
         apply_url = str(row["application_apply_url"] or row["apply_url"] or row["job_url"] or "")
+        cover_letter_used = _first_text(cover_letter_pdf_path, row["cover_letter_path"], row["application_cover_letter_used"])
         update_application(
             canonical_job_id,
             status="applied",
             applied_at=now,
             resume_used=resume_used,
+            cover_letter_used=cover_letter_used,
             apply_url=apply_url,
             notes=notes,
+            application_workspace_path=application_workspace_path,
+            resume_pdf_path=resume_pdf_path,
+            cover_letter_pdf_path=cover_letter_pdf_path,
+            cover_letter_body_path=cover_letter_body_path,
+            answer_pack_path=answer_pack_path,
             db_path=db_path,
         )
 
@@ -956,7 +1231,7 @@ def get_companies(db_path: Path = DEFAULT_DB) -> list[dict[str, Any]]:
     finally:
         conn.close()
 SEARCH_COVERAGE_COLUMNS = [
-    "run_id", "run_started_at", "run_finished_at", "mode", "country", "source", "query", "location",
+    "run_id", "run_started_at", "run_finished_at", "mode", "country", "source", "role_family", "query", "location",
     "raw_count", "normalized_count", "deduped_count", "scored_count", "report_count",
     "skipped_by_filter_count", "merged_by_dedupe_count", "average_score", "high_score_count_70",
     "must_apply_count_85", "error_count", "error_message",

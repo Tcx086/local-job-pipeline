@@ -7,9 +7,11 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from .config_loader import load_path_with_fallback
 from .docx_qa import convert_docx_to_pdf, find_soffice
-from .utils import CONFIG_DIR, PROJECT_ROOT, RESUMES_DIR, TEMPLATES_DIR, flatten_text, list_to_cell, load_yaml, normalize_text_escapes, slugify, today_yyyymmdd
+from .resources import load_candidate_master
+from .utils import CONFIG_DIR, PROJECT_ROOT, RESUMES_DIR, TEMPLATES_DIR, flatten_text, list_to_cell, load_yaml, normalize_text_escapes, slugify, today_yyyymmdd, write_json
+from .workspace import ApplicationWorkspace, PathRegistry
+from .workspace.artifacts import write_workspace_source_files
 
 
 
@@ -74,18 +76,17 @@ ROLE_PROFILES = {
 }
 
 
-RESUME_PROFILE_PATHS_CONFIG = CONFIG_DIR / "resume_profile_paths.local.yaml"
+RESUME_PROFILE_PATHS_CONFIG = CONFIG_DIR / "resume_profile_paths.yaml"
 HUMAN_DOCX_RENDERER = "docx_template"
 PDF_RENDERER_DOCX = "docx_to_pdf"
 PDF_RENDERER_MARKDOWN_FALLBACK = "markdown_fallback"
 
 PROFILE_ROLE_CATEGORIES = {
-    "general_data": "data",
-    "business_operations": "general",
-    "sales_operations": "general",
-    "technical_support": "api",
-    "finance_operations": "risk",
-    "operations": "trading_ops",
+    "data_market_data": "data",
+    "risk_operations": "risk",
+    "trading_operations": "trading_ops",
+    "api_technical_operations": "api",
+    "capital_markets_business": "capital_markets",
 }
 
 SKILL_GROUP_LABELS = {
@@ -115,9 +116,10 @@ SKILL_GROUP_ORDER = [
 ]
 
 
-def load_master_resume(path: Path) -> dict[str, Any]:
-    data = load_path_with_fallback(path)
-    return data if isinstance(data, dict) else {}
+def load_master_resume(path: Path | None, paths: PathRegistry | None = None) -> dict[str, Any]:
+    if path is None:
+        return load_candidate_master(paths)
+    return load_yaml(path)
 
 
 def _keyword_set(keyword_info: dict[str, Any], role_category: str, *, direct_only: bool = False) -> set[str]:
@@ -153,21 +155,27 @@ def _rank_items(
 
 def _flatten_skills(master: dict[str, Any]) -> list[str]:
     skills: list[str] = []
-    raw_skills = master.get("skills", {})
-    if isinstance(raw_skills, dict):
-        for values in raw_skills.values():
-            if isinstance(values, list):
-                skills.extend(str(value) for value in values)
-    elif isinstance(raw_skills, list):
-        skills.extend(str(value) for value in raw_skills)
+    for values in master.get("skills", {}).values():
+        if isinstance(values, list):
+            skills.extend(str(value) for value in values)
     return skills
 
 
 
 def _dict_items(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        items: list[dict[str, Any]] = []
+        for key, item in value.items():
+            if not isinstance(item, dict):
+                continue
+            row = dict(item)
+            row.setdefault("id", str(key))
+            row.setdefault("name", row.get("title") or str(key).replace("_", " ").title())
+            items.append(row)
+        return items
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    return []
 
 def select_skills(master: dict[str, Any], keywords: set[str], limit: int = 24, keyword_info: dict[str, Any] | None = None) -> list[str]:
     keyword_info = keyword_info or {}
@@ -453,7 +461,7 @@ def _add_bullet(doc: Any, text: str) -> None:
     _set_paragraph_spacing(paragraph, after=0.8)
     paragraph.paragraph_format.left_indent = imports["Inches"](0.18)
     paragraph.paragraph_format.first_line_indent = imports["Inches"](-0.18)
-    run = paragraph.add_run("Ã¢â‚¬Â¢ ")
+    run = paragraph.add_run("\u2022 ")
     _set_run(run, size=8.6)
     run = paragraph.add_run(_clean_resume_text(text))
     _set_run(run, size=8.6)
@@ -511,7 +519,7 @@ def write_human_docx_resume(
     except ModuleNotFoundError:
         return False
 
-    doc = _prepare_human_doc(template_path)
+    doc = _prepare_human_doc(template_path or TEMPLATES_DIR / "master_resume_source.docx")
     sections = _human_resume_sections(master, job, keyword_info)
     _add_centered_line(doc, str(master.get("name") or ""), size=15.5, bold=True, after=0.4)
     contact = _format_contact(master)
@@ -614,7 +622,7 @@ def generate_profile_resumes(
     make_pdf: bool = True,
     template_path: Path | None = None,
 ) -> list[dict[str, Any]]:
-    config = load_path_with_fallback(profile_config_path)
+    config = load_yaml(profile_config_path)
     profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
     results: list[dict[str, Any]] = []
     for profile, payload in profiles.items():
@@ -636,7 +644,7 @@ def generate_profile_resumes(
             job,
             keyword_info,
             docx_path,
-            template_path=template_path,
+            template_path=template_path or TEMPLATES_DIR / "master_resume_source.docx",
         )
         pdf_renderer = ""
         if make_pdf and docx_created:
@@ -763,27 +771,41 @@ def write_pdf_from_markdown(markdown_text: str, out_path: Path) -> bool:
 
 def generate_resume(
     *,
-    master_resume_path: Path,
+    master_resume_path: Path | None = None,
     job: dict[str, Any],
     keyword_info: dict[str, Any],
-    output_dir: Path = RESUMES_DIR,
+    output_dir: Path | None = None,
     output_date: str | None = None,
     make_docx: bool = True,
     make_pdf: bool = True,
     template_path: Path | None = None,
+    path_registry: PathRegistry | None = None,
+    workspace_date: str | None = None,
 ) -> dict[str, Any]:
-    master = load_master_resume(master_resume_path)
-    date_part = output_date or today_yyyymmdd()
-    company = slugify(job.get("company"), 60)
-    role = slugify(job.get("title") or job.get("role_category"), 55)
-    score = int(job.get("score") or 0)
-    resume_id = slugify(job.get("canonical_job_id") or job.get("source_job_id") or job.get("job_id"), 12)
-    suffix = f"_{resume_id}" if resume_id != "item" else ""
-    stem = f"{role}_{score}{suffix}"
-    target_dir = output_dir / company / date_part
-    md_path = target_dir / f"{stem}.md"
-    docx_path = target_dir / f"{stem}.docx"
-    pdf_path = target_dir / f"{stem}.pdf"
+    registry = path_registry or PathRegistry.from_project_root()
+    master = load_master_resume(master_resume_path, registry)
+    workspace: ApplicationWorkspace | None = None
+    if output_dir is None:
+        workspace = ApplicationWorkspace.from_job(job, paths=registry, date=workspace_date or output_date)
+        write_workspace_source_files(workspace, job, scoring_snapshot={"keyword_info": keyword_info, "score": job.get("score", "")})
+        target_dir = workspace.root
+        md_path = workspace.resume_review_md_path()
+        docx_path = workspace.resume_docx_path()
+        pdf_path = workspace.resume_pdf_path()
+        source_json_path = workspace.resume_source_json_path()
+    else:
+        date_part = output_date or today_yyyymmdd()
+        company = slugify(job.get("company"), 60)
+        role = slugify(job.get("title") or job.get("role_category"), 55)
+        score = int(job.get("score") or 0)
+        resume_id = slugify(job.get("canonical_job_id") or job.get("source_job_id") or job.get("job_id"), 12)
+        suffix = f"_{resume_id}" if resume_id != "item" else ""
+        stem = f"{role}_{score}{suffix}"
+        target_dir = output_dir / company / date_part
+        md_path = target_dir / f"{stem}.md"
+        docx_path = target_dir / f"{stem}.docx"
+        pdf_path = target_dir / f"{stem}.pdf"
+        source_json_path = target_dir / f"{stem}.json"
 
     markdown = render_markdown_resume(master, job, keyword_info)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -796,7 +818,7 @@ def generate_resume(
             job,
             keyword_info,
             docx_path,
-            template_path=template_path,
+            template_path=template_path or TEMPLATES_DIR / "master_resume_source.docx",
         )
         if docx_created:
             docx_renderer = HUMAN_DOCX_RENDERER
@@ -804,7 +826,7 @@ def generate_resume(
             docx_created = write_docx_from_markdown(
                 markdown,
                 docx_path,
-                template_path=template_path,
+                template_path=template_path or TEMPLATES_DIR / "master_resume_source.docx",
             )
             docx_renderer = PDF_RENDERER_MARKDOWN_FALLBACK if docx_created else ""
     pdf_renderer = ""
@@ -813,6 +835,33 @@ def generate_resume(
             pdf_renderer = write_pdf_from_docx(docx_path, pdf_path, fallback_markdown=markdown)
         elif write_pdf_from_markdown(markdown, pdf_path):
             pdf_renderer = PDF_RENDERER_MARKDOWN_FALLBACK
+    if workspace is not None:
+        write_json(
+            source_json_path,
+            {
+                "metadata": {
+                    "canonical_job_id": job.get("canonical_job_id") or job.get("job_id") or "",
+                    "company": job.get("company", ""),
+                    "title": job.get("title", ""),
+                    "created_for_workspace": str(workspace.root),
+                },
+                "keyword_info": keyword_info,
+                "renderers": {"docx": docx_renderer, "pdf": pdf_renderer},
+            },
+        )
+        manifest = workspace.write_manifest()
+        return {
+            "directory": str(target_dir),
+            "markdown": str(md_path),
+            "markdown_review": str(md_path),
+            "docx": str(docx_path) if docx_created else "",
+            "pdf": str(pdf_path) if pdf_path.exists() else "",
+            "source_json": str(source_json_path),
+            "workspace": str(workspace.root),
+            "manifest": str(workspace.manifest_path),
+            "docx_renderer": docx_renderer,
+            "pdf_renderer": pdf_renderer,
+        }
     return {
         "directory": str(target_dir),
         "markdown": str(md_path),
