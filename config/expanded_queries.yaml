@@ -1,4 +1,4 @@
-﻿role_families:
+role_families:
   trading_operations:
     base_titles:
       - "Trading Operations Analyst"
@@ -133,8 +133,26 @@ generic_backfill_terms:
 
 location_groups:
   canada:
-    - "Toronto, ON"
-    - "Remote, Canada"
-  united_states:
-    - "Remote, United States"
-    - "New York, NY"
+    - "Canada"
+    - "Remote Canada"
+    - "Toronto"
+    - "Greater Toronto Area"
+    - "Mississauga"
+    - "North York"
+    - "Markham"
+    - "Waterloo"
+    - "Vancouver"
+    - "Montreal"
+    - "Calgary"
+    - "Ottawa"
+  singapore:
+    - "Singapore"
+    - "Singapore City"
+    - "Remote Singapore"
+  hong_kong:
+    - "Hong Kong"
+    - "Hong Kong SAR"
+    - "Central Hong Kong"
+    - "Sheung Wan"
+    - "Kwun Tong"
+    - "Remote Hong Kong"

@@ -1,0 +1,53 @@
+name: "Candidate Name"
+headline: "Example data and market-data analyst profile"
+location: "City, Country"
+contact:
+  location: "City, Country"
+  email: "candidate@example.com"
+  phone: ""
+  linkedin: ""
+  github: ""
+contacts:
+  email: "candidate@example.com"
+  phone: ""
+  linkedin: ""
+summary:
+  - "Example profile for a role family. Replace all content with local private facts before use."
+  - "Emphasizes data cleaning, market data review, and reporting using fake example evidence."
+education:
+  - degree: "Example Degree"
+    school: "Example University"
+    date: "Example Year"
+    details:
+      - "Example coursework in analysis"
+projects:
+  example_role_project:
+    title: "Example Market Data Review Project"
+    type: "Example Project"
+    dates: "Example Year"
+    bullets:
+      - "Built an example workflow that used data cleaning to organize sample inputs."
+      - "Prepared example documentation connecting market data review with a manual review step."
+experience:
+  - title: "Example Role"
+    company: "Example Company"
+    location: "City, Country"
+    dates: "Example Dates"
+    bullets:
+      - "Supported example tasks involving reporting and structured communication."
+      - "Tracked sample issues and summarized outcomes for review."
+skills:
+  programming_data:
+    - "Python"
+    - "SQL"
+    - "Spreadsheet analysis"
+  role_focus:
+    - "data cleaning"
+    - "market data review"
+    - "reporting"
+  operations:
+    - "Documentation"
+    - "Manual QA"
+    - "Process tracking"
+languages:
+  - "English"

@@ -23,16 +23,16 @@ from .database import (
 from .dedupe import dedupe_current_jobs
 from .keyword_extract import extract_keywords
 from .normalize import normalize_jobs
-from .config_loader import resolve_public_config_path
 from .query_expander import MODE_NAMES, build_search_config, describe_search_plan, get_search_mode, load_reporting_config
 from .report import generate_reports
+from .resources import load_candidate_master
 from .resume_tailor import generate_resume
 from .score import score_jobs
 from .score_calibration import record_score_calibration
 from .search_diagnostics import build_coverage_rows, record_search_coverage
 from .search_url_builder import write_manual_search_urls
 from .source_health import build_source_health_rows, record_source_health
-from .utils import CONFIG_DIR, RAW_DIR, TEMPLATES_DIR, ensure_dirs, flatten_text, load_yaml, setup_logging, today_yyyymmdd, write_csv, write_json
+from .utils import CONFIG_DIR, RAW_DIR, ensure_dirs, flatten_text, load_yaml, setup_logging, today_yyyymmdd, write_csv, write_json
 
 LOGGER = setup_logging(__name__)
 
@@ -41,11 +41,11 @@ def sample_jobs() -> list[dict[str, Any]]:
     collected_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return [
         {
-            "job_id": "sample_linkedin_example_analytics_data",
-            "source_job_id": "sample_linkedin_example_analytics_data",
+            "job_id": "sample_linkedin_wealthsimple_market_data",
+            "source_job_id": "sample_linkedin_wealthsimple_market_data",
             "source": "linkedin",
             "title": "Market Data Analyst",
-            "company": "Example Analytics Co",
+            "company": "Wealthsimple",
             "location": "Toronto, ON",
             "country": "Canada",
             "date_posted": today_yyyymmdd(),
@@ -53,18 +53,18 @@ def sample_jobs() -> list[dict[str, Any]]:
             "job_type": "fulltime",
             "salary_min": "",
             "salary_max": "",
-            "job_url": "https://example.com/example-analytics-data-linkedin",
-            "apply_url": "https://example.com/example-analytics-data-linkedin/apply",
+            "job_url": "https://example.com/wealthsimple-market-data-linkedin",
+            "apply_url": "https://example.com/wealthsimple-market-data-linkedin/apply",
             "description": "Analyze market data, support reporting, build SQL and Python data pipelines, reconcile data quality issues, and work with product and operations teams.",
             "search_term_used": "Market Data Analyst",
             "collected_at": collected_at,
         },
         {
-            "job_id": "sample_greenhouse_example_analytics_data",
+            "job_id": "sample_greenhouse_wealthsimple_market_data",
             "source_job_id": "12345",
             "source": "greenhouse",
             "title": "Market Data Analyst",
-            "company": "Example Analytics Co",
+            "company": "Wealthsimple",
             "location": "Toronto, ON",
             "country": "Canada",
             "date_posted": today_yyyymmdd(),
@@ -72,10 +72,10 @@ def sample_jobs() -> list[dict[str, Any]]:
             "job_type": "fulltime",
             "salary_min": "",
             "salary_max": "",
-            "job_url": "https://boards.greenhouse.io/example/jobs/12345",
-            "apply_url": "https://boards.greenhouse.io/example/jobs/12345",
+            "job_url": "https://boards.greenhouse.io/wealthsimple/jobs/12345",
+            "apply_url": "https://boards.greenhouse.io/wealthsimple/jobs/12345",
             "description": "Analyze market data, support reporting, build SQL and Python data pipelines, reconcile data quality issues, and work with product and operations teams.",
-            "ats_company_token": "example",
+            "ats_company_token": "wealthsimple",
             "collected_at": collected_at,
         },
         {
@@ -83,16 +83,16 @@ def sample_jobs() -> list[dict[str, Any]]:
             "source_job_id": "sample_okx_api_ops",
             "source": "sample",
             "title": "API Support Analyst",
-            "company": "Example Support Systems",
-            "location": "Remote, United States",
-            "country": "United States",
+            "company": "OKX",
+            "location": "Singapore",
+            "country": "Singapore",
             "date_posted": today_yyyymmdd(),
             "posted_at": today_yyyymmdd(),
             "job_type": "fulltime",
             "salary_min": "",
             "salary_max": "",
-            "job_url": "https://example.com/api-support",
-            "apply_url": "https://example.com/api-support/apply",
+            "job_url": "https://example.com/okx-api-support",
+            "apply_url": "https://example.com/okx-api-support/apply",
             "description": "Provide technical operations support for REST API clients, JSON data issues, crypto market data, dashboards, incident review, and customer-facing troubleshooting.",
             "search_term_used": "API Support Analyst",
             "collected_at": collected_at,
@@ -102,16 +102,16 @@ def sample_jobs() -> list[dict[str, Any]]:
             "source_job_id": "sample_bank_risk_ops",
             "source": "sample",
             "title": "Risk Operations Analyst",
-            "company": "Example Finance Ops",
-            "location": "Remote, Canada",
-            "country": "Canada",
+            "company": "DBS",
+            "location": "Hong Kong",
+            "country": "Hong Kong",
             "date_posted": today_yyyymmdd(),
             "posted_at": today_yyyymmdd(),
             "job_type": "fulltime",
             "salary_min": "",
             "salary_max": "",
-            "job_url": "https://example.com/risk-ops",
-            "apply_url": "https://example.com/risk-ops/apply",
+            "job_url": "https://example.com/dbs-risk-ops",
+            "apply_url": "https://example.com/dbs-risk-ops/apply",
             "description": "Support operational risk reporting, credit risk data checks, Excel tracking, reconciliation, data cleaning, and cross-functional business analysis.",
             "search_term_used": "Risk Operations Analyst",
             "collected_at": collected_at,
@@ -122,8 +122,8 @@ def sample_jobs() -> list[dict[str, Any]]:
             "source": "sample",
             "title": "Senior Quant Trader - Low Latency C++",
             "company": "Example Trading",
-            "location": "Remote, United States",
-            "country": "United States",
+            "location": "Singapore",
+            "country": "Singapore",
             "date_posted": today_yyyymmdd(),
             "posted_at": today_yyyymmdd(),
             "job_type": "fulltime",
@@ -139,7 +139,9 @@ def sample_jobs() -> list[dict[str, Any]]:
 
 
 def load_search_config(mode: str | None = None) -> dict[str, Any]:
-    return build_search_config(mode or "normal")
+    if mode:
+        return build_search_config(mode)
+    return load_yaml(CONFIG_DIR / "search_queries.yaml")
 
 
 def collect_from_config(config: dict[str, Any], hours_old: int | None = None, results_wanted: int | None = None) -> list[dict[str, Any]]:
@@ -149,8 +151,16 @@ def collect_from_config(config: dict[str, Any], hours_old: int | None = None, re
     return rows
 
 
-def enrich_for_resume_and_report(jobs: list[dict[str, Any]], *, master_resume_path: Path, resume_score_threshold: int = 70, make_docx: bool = True, generate_resumes: bool = False) -> list[dict[str, Any]]:
-    master_resume = load_yaml(master_resume_path)
+def enrich_for_resume_and_report(jobs: list[dict[str, Any]], *, master_resume_path: Path | None = None, resume_score_threshold: int = 70, make_docx: bool = True, generate_resumes: bool = False) -> list[dict[str, Any]]:
+    if master_resume_path is not None:
+        master_resume = load_yaml(master_resume_path)
+    else:
+        try:
+            master_resume = load_candidate_master()
+        except FileNotFoundError:
+            if generate_resumes:
+                raise
+            master_resume = {}
     master_text = flatten_text(master_resume)
     enriched: list[dict[str, Any]] = []
     for job in jobs:
@@ -212,19 +222,8 @@ def run_once(
     ensure_dirs()
     initialize_company_registry(db_path)
     mode_settings = get_search_mode(mode)
-    planned_search_config = build_search_config(
-        mode,
-        max_queries=max_queries,
-        max_locations=max_locations,
-        max_query_location_pairs=max_query_location_pairs,
-        query_family=query_family,
-        country=country,
-        source_sites=source_sites,
-        no_rotation=no_rotation,
-    )
-    config_settings = planned_search_config.get("settings") or {}
-    hours_old = hours_old if hours_old is not None else int(config_settings.get("hours_old") or mode_settings["days_back"] * 24)
-    results_wanted = results_wanted if results_wanted is not None else int(config_settings.get("results_wanted") or mode_settings["results_wanted_per_query"])
+    hours_old = hours_old if hours_old is not None else mode_settings["days_back"] * 24
+    results_wanted = results_wanted if results_wanted is not None else mode_settings["results_wanted_per_query"]
     resume_score_threshold = resume_score_threshold if resume_score_threshold is not None else mode_settings["generate_resume_min_score"]
     min_score_report = int(mode_settings["min_score_report"])
     run_started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -283,7 +282,7 @@ def run_once(
     unique_current, duplicates, merge_events = dedupe_current_jobs(scored, run_id=run_id, return_events=True)
     final_jobs = enrich_for_resume_and_report(
         unique_current,
-        master_resume_path=resolve_public_config_path("master_resume"),
+        master_resume_path=None,
         resume_score_threshold=resume_score_threshold,
         make_docx=make_docx,
         generate_resumes=generate_resumes,
@@ -423,27 +422,23 @@ def main(argv: list[str] | None = None) -> int:
         "no_rotation": args.no_rotation,
     }
     if args.dry_run_plan:
-        try:
-            search_config = build_search_config(
-                args.mode,
-                max_queries=args.max_queries,
-                max_locations=args.max_locations,
-                max_query_location_pairs=args.max_query_location_pairs,
-                query_family=args.query_family,
-                country=args.country,
-                source_sites=args.source_sites,
-                no_rotation=args.no_rotation,
-            )
-            print(json.dumps(describe_search_plan(search_config, mode=args.mode), ensure_ascii=False, indent=2))
-        except (RuntimeError, ValueError) as exc:
-            print(str(exc), file=sys.stderr)
-            return 2
+        search_config = build_search_config(
+            args.mode,
+            max_queries=args.max_queries,
+            max_locations=args.max_locations,
+            max_query_location_pairs=args.max_query_location_pairs,
+            query_family=args.query_family,
+            country=args.country,
+            source_sites=args.source_sites,
+            no_rotation=args.no_rotation,
+        )
+        print(json.dumps(describe_search_plan(search_config, mode=args.mode), ensure_ascii=False, indent=2))
         return 0
 
     if args.run_once:
         try:
             summary = run_once(**kwargs)
-        except (RuntimeError, ValueError) as exc:
+        except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 2
         print(json.dumps(summary, ensure_ascii=False, indent=2))

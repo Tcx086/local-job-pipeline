@@ -1,0 +1,29 @@
+profiles:
+  data_market_data:
+    source: "resources/role_profiles/data_market_data.example.yaml"
+    docx: "generated/profiles/data_market_data.docx"
+    pdf: "generated/profiles/data_market_data.pdf"
+  risk_operations:
+    source: "resources/role_profiles/risk_operations.example.yaml"
+    docx: "generated/profiles/risk_operations.docx"
+    pdf: "generated/profiles/risk_operations.pdf"
+  trading_operations:
+    source: "resources/role_profiles/trading_operations.example.yaml"
+    docx: "generated/profiles/trading_operations.docx"
+    pdf: "generated/profiles/trading_operations.pdf"
+  quality_assurance:
+    source: "resources/role_profiles/quality_assurance.example.yaml"
+    docx: "generated/profiles/quality_assurance.docx"
+    pdf: "generated/profiles/quality_assurance.pdf"
+  api_technical_operations:
+    source: "resources/role_profiles/api_technical_operations.example.yaml"
+    docx: "generated/profiles/api_technical_operations.docx"
+    pdf: "generated/profiles/api_technical_operations.pdf"
+  capital_markets_business:
+    source: "resources/role_profiles/capital_markets_business.example.yaml"
+    docx: "generated/profiles/capital_markets_business.docx"
+    pdf: "generated/profiles/capital_markets_business.pdf"
+  client_finance:
+    source: "resources/role_profiles/client_finance.example.yaml"
+    docx: "generated/profiles/client_finance.docx"
+    pdf: "generated/profiles/client_finance.pdf"

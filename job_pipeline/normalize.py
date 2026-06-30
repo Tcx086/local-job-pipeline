@@ -10,20 +10,18 @@ COUNTRY_PATTERNS = {
     "Canada": [
         "canada",
         "toronto",
+        "mississauga",
+        "waterloo",
         "montreal",
         "vancouver",
+        "calgary",
         "ontario",
         "quebec",
         "british columbia",
+        "alberta",
     ],
-    "United States": [
-        "united states",
-        "usa",
-        "u.s.",
-        "new york",
-        "california",
-        "remote, united states",
-    ],
+    "Singapore": ["singapore"],
+    "Hong Kong": ["hong kong", "hk"],
 }
 
 SENIORITY_PATTERNS = [

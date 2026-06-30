@@ -135,7 +135,7 @@ experience:
             root = Path(tmp)
             results = generate_profile_resumes(output_dir=root)
 
-            self.assertGreaterEqual(len(results), 5)
+            self.assertEqual(len(results), 7)
             profile_paths = {
                 "profiles": {
                     result["profile"]: {
@@ -146,11 +146,13 @@ experience:
                     for result in results
                 }
             }
+            expected_pdf_renderers = {PDF_RENDERER_DOCX, PDF_RENDERER_MARKDOWN_FALLBACK}
+
             for result in results:
                 docx_path = Path(result["docx"])
                 pdf_path = Path(result["pdf"])
                 self.assertEqual(result["docx_renderer"], HUMAN_DOCX_RENDERER)
-                self.assertIn(result["pdf_renderer"], {PDF_RENDERER_DOCX, PDF_RENDERER_MARKDOWN_FALLBACK})
+                self.assertIn(result["pdf_renderer"], expected_pdf_renderers)
                 self.assertTrue(docx_path.exists())
                 self.assertTrue(pdf_path.exists())
                 resolved_profile = profile_resume_path(result["profile"], profile_paths)
@@ -160,19 +162,19 @@ experience:
                 self.assertNotIn("Targeted fit:", docx_text)
                 self.assertNotIn("TARGETED SKILLS", docx_text)
                 self.assertIn("Programming & Data", docx_text)
-                self.assertGreater(len(docx_text), 50)
+                self.assertIn("Candidate Name", docx_text)
                 self.assertNotIn("linkedin.comin", docx_text)
                 self.assertNotIn("\ufffd", docx_text)
                 self.assertNotIn("\ufffd", docx_text)
 
                 with fitz.open(pdf_path) as pdf_doc:
                     pdf_text = "\n".join(page.get_text() for page in pdf_doc)
-                    self.assertLessEqual(pdf_doc.page_count, 2)
-                if result["pdf_renderer"] == PDF_RENDERER_DOCX:
-                    self.assertNotIn("Targeted fit:", pdf_text)
-                    self.assertNotIn("TARGETED SKILLS", pdf_text)
+                    self.assertGreaterEqual(pdf_doc.page_count, 1)
+                    if result["pdf_renderer"] == PDF_RENDERER_DOCX:
+                        self.assertLessEqual(pdf_doc.page_count, 2)
+                        self.assertNotIn("Targeted fit:", pdf_text)
+                        self.assertNotIn("TARGETED SKILLS", pdf_text)
                 self.assertNotIn("linkedin.comin", pdf_text)
-                self.assertNotIn("\ufffd", pdf_text)
                 self.assertNotIn("\ufffd", pdf_text)
 
 

@@ -1,0 +1,26 @@
+{
+  "data": {
+    "name": "FinTech / Crypto Data Analyst",
+    "priority_keywords": ["Python", "SQL", "pandas", "market data", "data cleaning", "reporting", "dashboard", "API integration"]
+  },
+  "trading_ops": {
+    "name": "Trading Operations / Market Data",
+    "priority_keywords": ["market data", "trade support", "reconciliation", "risk control", "trading system", "Excel", "reporting"]
+  },
+  "risk": {
+    "name": "Risk Analyst / Risk Operations",
+    "priority_keywords": ["risk control", "credit risk", "operational risk", "reporting", "data analysis", "documentation accuracy"]
+  },
+  "capital_markets": {
+    "name": "Capital Markets / Business Analyst",
+    "priority_keywords": ["capital markets", "business analysis", "financial markets", "stakeholder communication", "Excel", "reporting"]
+  },
+  "api": {
+    "name": "API / Technical Operations",
+    "priority_keywords": ["REST API", "API integration", "JSON", "technical operations", "automation", "customer-facing troubleshooting"]
+  },
+  "crypto_ops": {
+    "name": "Crypto Operations Analyst",
+    "priority_keywords": ["crypto market data", "order book", "exchange operations", "digital assets", "risk control", "market monitoring"]
+  }
+}

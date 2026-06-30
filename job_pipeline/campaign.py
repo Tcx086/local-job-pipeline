@@ -6,28 +6,27 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .config_loader import load_public_config
 from .database import DEFAULT_DB, get_jobs, replace_campaign_items
 from .score import score_band
 from .utils import CONFIG_DIR, PROJECT_ROOT, REPORTS_DIR, TEMPLATES_DIR, list_to_cell, load_yaml, now_utc_iso, today_yyyymmdd, write_csv
 
-APPLICATION_CAMPAIGN_CONFIG = CONFIG_DIR / "application_campaign.local.yaml"
-RESUME_PROFILE_PATHS_CONFIG = CONFIG_DIR / "resume_profile_paths.local.yaml"
+APPLICATION_CAMPAIGN_CONFIG = CONFIG_DIR / "application_campaign.yaml"
+RESUME_PROFILE_PATHS_CONFIG = CONFIG_DIR / "resume_profile_paths.yaml"
 
 EFFORTS = ["deep_tailor", "standard_tailor", "quick_apply", "hold", "skip"]
 ACTIONABLE_EFFORTS = ["deep_tailor", "standard_tailor", "quick_apply"]
 EFFORT_PRIORITY = {effort: idx for idx, effort in enumerate(EFFORTS)}
 FRESHNESS_PRIORITY = {"new_today": 0, "new_this_week": 1, "recent": 2, "unknown": 3, "old": 4}
-COUNTRY_PRIORITY = {"Remote": 99}
-DEFAULT_PROFILE = "general_data"
+COUNTRY_PRIORITY = {"Canada": 0, "Singapore": 1, "Hong Kong": 2, "Remote": 3}
+DEFAULT_PROFILE = "data_market_data"
 
 ROLE_CATEGORY_PROFILE = {
-    "data": "general_data",
-    "risk": "finance_operations",
-    "trading_ops": "operations",
-    "crypto_ops": "operations",
-    "api": "technical_support",
-    "capital_markets": "finance_operations",
+    "data": "data_market_data",
+    "risk": "risk_operations",
+    "trading_ops": "trading_operations",
+    "crypto_ops": "trading_operations",
+    "api": "api_technical_operations",
+    "capital_markets": "capital_markets_business",
 }
 
 SEVERE_RED_FLAGS = {
@@ -59,75 +58,15 @@ SKIP_PATTERNS = [
     (re.compile(r"\b(sales development representative|business development representative|account executive|cold calling)\b", re.I), "pure sales role"),
 ]
 
-PENALTY_REASON_LABELS = {
-    "senior_title": "senior title",
-    "senior_or_lead_level": "senior/lead level",
-    "manager_title": "manager/director title",
-    "three_plus_years": "3+ years requirement",
-    "five_plus_years": "5+ years requirement",
-    "high_years_required": "high-years requirement",
-    "local_presence_required": "local presence required",
-    "local_presence_required_without_sponsorship": "local presence without sponsorship",
-    "citizenship_only": "citizenship-only wording",
-    "work_authorization_restricted": "work authorization restriction",
-    "sponsorship_not_available": "no sponsorship",
-    "masters_required": "master's required",
-    "masters_preferred": "master's preferred",
-    "cpp_required": "C++ required",
-    "low_latency_cpp": "low-latency C++",
-    "pure_quant_track": "pure quant track",
-    "no_description": "missing description",
-}
-
-SHORT_EFFORT_LABELS = {
-    "deep_tailor": "deep",
-    "standard_tailor": "standard",
-    "quick_apply": "quick",
-    "hold": "hold",
-    "skip": "skip",
-}
-
-SHORT_REASON_LABELS = {
-    "senior_title": "senior",
-    "senior_or_lead_level": "senior/lead/staff",
-    "manager_title": "manager",
-    "three_plus_years": "3+ yrs",
-    "five_plus_years": "5+ yrs",
-    "high_years_required": "high yrs",
-    "local_presence_required": "local required",
-    "local_presence_required_without_sponsorship": "local/no sponsorship",
-    "citizenship_only": "citizenship",
-    "work_authorization_restricted": "work auth",
-    "sponsorship_not_available": "no sponsorship",
-    "masters_required": "master req",
-    "masters_preferred": "master pref",
-    "cpp_required": "C++",
-    "low_latency_cpp": "low-latency C++",
-    "pure_quant_track": "pure quant",
-    "no_description": "no desc",
-}
-
-SEVERE_KEYWORD_REASON_LABELS = {"lead", "senior", "staff", "principal"}
-SENIOR_KEYWORD_RED_FLAGS = {"senior_title", "senior_or_lead_level"}
-BASE_RED_FLAG_PENALTIES = {
-    "senior_or_lead_level": 30,
-    "high_years_required": 25,
-    "phd_required": 30,
-    "work_authorization_restricted": 40,
-    "low_latency_cpp": 25,
-    "commission_or_unpaid": 30,
-    "no_description": 3,
-    "local_presence_required_without_sponsorship": 20,
-    "pure_quant_track": 20,
-}
-
 CAMPAIGN_FIELDS = [
     "campaign_date",
     "campaign_priority",
     "application_effort",
     "campaign_status",
-    "score",
-    "score_band",
+    "campaign_score",
+    "campaign_score_band",
+    "role_family",
+    "fit_category",
     "title",
     "company",
     "country",
@@ -139,11 +78,15 @@ CAMPAIGN_FIELDS = [
     "allow_manual_generate_resume",
     "auto_generate_answer_pack",
     "allow_manual_generate_answer_pack",
+    "auto_generate_cover_letter",
+    "allow_manual_generate_cover_letter",
     "should_generate_resume",
     "should_generate_answer_pack",
+    "should_generate_cover_letter",
     "profile_resume_path",
     "tailored_resume_path",
     "answer_pack_path",
+    "cover_letter_path",
     "apply_url",
     "job_url",
     "campaign_reason",
@@ -166,15 +109,16 @@ DEFAULT_CONFIG = {
         "allow_manual_generate_resume": {"deep_tailor": True, "standard_tailor": True, "quick_apply": False, "hold": False, "skip": False},
         "auto_generate_answer_pack": {"deep_tailor": False, "standard_tailor": False, "quick_apply": False, "hold": False, "skip": False},
         "allow_manual_generate_answer_pack": {"deep_tailor": True, "standard_tailor": True, "quick_apply": False, "hold": False, "skip": False},
+        "auto_generate_cover_letter": {"deep_tailor": False, "standard_tailor": False, "quick_apply": False, "hold": False, "skip": False},
+        "allow_manual_generate_cover_letter": {"deep_tailor": True, "standard_tailor": True, "quick_apply": False, "hold": False, "skip": False},
         "quick_apply_requires_existing_profile_resume": True,
     },
     "resume_profiles": {
-        "general_data": {"keywords": ["data analyst", "reporting", "sql", "python", "spreadsheet"]},
-        "business_operations": {"keywords": ["business operations", "process", "workflow", "stakeholder"]},
-        "sales_operations": {"keywords": ["sales operations", "crm", "pipeline", "revenue operations"]},
-        "technical_support": {"keywords": ["technical support", "api", "troubleshooting", "customer support"]},
-        "finance_operations": {"keywords": ["finance operations", "risk", "reconciliation", "reporting"]},
-        "operations": {"keywords": ["operations", "coordination", "process improvement", "reconciliation"]},
+        "data_market_data": {"keywords": ["data analyst", "market data", "reporting", "sql", "python"]},
+        "risk_operations": {"keywords": ["risk analyst", "risk operations", "credit risk", "controls"]},
+        "trading_operations": {"keywords": ["trading operations", "trade support", "settlements", "reconciliation"]},
+        "api_technical_operations": {"keywords": ["api support", "api integration", "technical operations", "rest api"]},
+        "capital_markets_business": {"keywords": ["capital markets", "business analyst", "treasury", "payments"]},
     },
 }
 
@@ -190,9 +134,6 @@ def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]
 
 
 def load_campaign_config(path: Path = APPLICATION_CAMPAIGN_CONFIG) -> dict[str, Any]:
-    if path == APPLICATION_CAMPAIGN_CONFIG:
-        data = load_public_config("application_campaign") or {}
-        return _deep_merge(DEFAULT_CONFIG, data if isinstance(data, dict) else {})
     if not path.exists():
         return DEFAULT_CONFIG
     data = load_yaml(path) or {}
@@ -200,9 +141,6 @@ def load_campaign_config(path: Path = APPLICATION_CAMPAIGN_CONFIG) -> dict[str, 
 
 
 def load_resume_profile_paths(path: Path = RESUME_PROFILE_PATHS_CONFIG) -> dict[str, Any]:
-    if path == RESUME_PROFILE_PATHS_CONFIG:
-        data = load_public_config("resume_profile_paths") or {}
-        return data if isinstance(data, dict) else {"profiles": {}}
     if not path.exists():
         return {"profiles": {}}
     data = load_yaml(path) or {}
@@ -250,6 +188,8 @@ def _job_text(job: dict[str, Any]) -> str:
         job.get("location"),
         job.get("country"),
         job.get("role_category"),
+        job.get("role_family"),
+        job.get("fit_category"),
         job.get("description"),
         " ".join(str(item) for item in _as_list(job.get("matched_keywords"))),
         " ".join(str(item) for item in _as_list(job.get("red_flags"))),
@@ -277,161 +217,17 @@ def _has_skip_disqualifier(job: dict[str, Any]) -> tuple[bool, str]:
     return False, ""
 
 
-def _soft_penalty_lookup(job: dict[str, Any]) -> dict[str, int]:
-    lookup: dict[str, int] = {}
-    for item in _as_list(job.get("soft_penalties")):
-        if not isinstance(item, dict):
-            continue
-        rule = str(item.get("rule") or "").strip().lower()
-        if not rule:
-            continue
-        try:
-            penalty = int(item.get("applied_penalty", item.get("penalty") or 0) or 0)
-        except (TypeError, ValueError):
-            penalty = 0
-        if penalty:
-            lookup[rule] = penalty
-    return lookup
-
-
-def _penalty_label(rule_id: str) -> str:
-    return PENALTY_REASON_LABELS.get(rule_id, rule_id.replace("_", " "))
-
-
-def _flag_reason(flag: str, penalties: dict[str, int]) -> str:
-    penalty = penalties.get(flag)
-    label = _penalty_label(flag)
-    return f"{label} -{penalty}" if penalty else label
-
-
-def _short_effort_label(effort: str) -> str:
-    return SHORT_EFFORT_LABELS.get(effort, effort.replace("_tailor", "").replace("_apply", ""))
-
-
-def _short_reason_label(rule_id: str) -> str:
-    return SHORT_REASON_LABELS.get(rule_id, _penalty_label(rule_id))
-
-
-def _short_flag_reason(flag: str, penalties: dict[str, int]) -> str:
-    penalty = penalties.get(flag)
-    if penalty is None:
-        penalty = BASE_RED_FLAG_PENALTIES.get(flag)
-    label = _short_reason_label(flag)
-    return f"{label} -{abs(penalty)}" if penalty else label
-
-
-def _short_keyword_reason(keyword: str) -> str:
-    normalized = keyword.lower().rstrip(".")
-    return "senior" if normalized == "sr" else normalized
-
-
-def _unique_reasons(reasons: list[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for reason in reasons:
-        text = str(reason or "").strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        result.append(text)
-    return result
-
-
-def _short_free_text_reason(reason: Any) -> str:
-    text = str(reason or "").strip().rstrip(".")
-    if not text:
-        return "hard skip"
-    lower = text.lower()
-    if "life sciences" in lower or "biotech" in lower:
-        return "life sci mismatch"
-    return text
-
-
-def _compact_reason_groups(reasons: list[str]) -> list[str]:
-    unique = _unique_reasons(reasons)
-    keyword_items: list[tuple[str, str]] = []
-    for reason in unique:
-        match = re.fullmatch(r"(lead|senior|staff|principal)( -\d+)?", reason)
-        if match:
-            keyword_items.append((match.group(1), match.group(2) or ""))
-    if len(keyword_items) < 2:
-        return unique
-
-    suffixes = {suffix for _, suffix in keyword_items}
-    grouped_suffix = next(iter(suffixes)) if len(suffixes) == 1 else ""
-    grouped_keywords = "/".join(keyword for keyword, _ in keyword_items) + grouped_suffix
-    compacted: list[str] = []
-    inserted = False
-    for reason in unique:
-        if re.fullmatch(r"(lead|senior|staff|principal)( -\d+)?", reason):
-            if not inserted:
-                compacted.append(grouped_keywords)
-                inserted = True
-            continue
-        compacted.append(reason)
-    return compacted
-
-
-def _format_campaign_reason(score: int, effort: str, reasons: list[str]) -> str:
-    reason_text = "; ".join(_compact_reason_groups(reasons))
-    base = f"{score} -> {_short_effort_label(effort)}"
-    return f"{base}: {reason_text}" if reason_text else base
-
-
-def _campaign_penalty_reasons(job: dict[str, Any]) -> list[str]:
-    penalties = _soft_penalty_lookup(job)
-    red_flags = _red_flags(job)
-    reasons = []
-    for rule in sorted(penalties):
-        if rule in SENIOR_KEYWORD_RED_FLAGS:
-            continue
-        if rule == "five_plus_years" and "high_years_required" in red_flags:
-            continue
-        reasons.append(_short_flag_reason(rule, penalties))
-    for flag in sorted(red_flags):
-        if flag in penalties or flag in SENIOR_KEYWORD_RED_FLAGS:
-            continue
-        if flag == "five_plus_years" and "high_years_required" in red_flags:
-            continue
-        reasons.append(_short_flag_reason(flag, penalties))
-    return _unique_reasons(reasons)
-
-
-def _severe_red_flag_reasons(job: dict[str, Any]) -> list[str]:
-    reasons: list[str] = []
-    penalties = _soft_penalty_lookup(job)
-    red_flags = _red_flags(job)
-    for flag in sorted((red_flags & SEVERE_RED_FLAGS) - SENIOR_KEYWORD_RED_FLAGS):
-        if flag == "five_plus_years" and "high_years_required" in red_flags:
-            continue
-        reasons.append(_short_flag_reason(flag, penalties))
-
-    keyword_penalty = BASE_RED_FLAG_PENALTIES["senior_or_lead_level"] if "senior_or_lead_level" in red_flags else penalties.get("senior_title")
-    title_text = str(job.get("title") or "")
-    for match in re.finditer(r"\b(senior|sr\.?|staff|principal|lead)\b", title_text, flags=re.I):
-        label = _short_keyword_reason(match.group(0))
-        reason = f"{label} -{keyword_penalty}" if keyword_penalty else label
-        if reason not in reasons:
-            reasons.append(reason)
-
-    text = _job_text(job)
-    for match in re.finditer(r"\b(senior|sr\.?|staff|principal|lead)\b", text, flags=re.I):
-        label = _short_keyword_reason(match.group(0))
-        reason = f"{label} -{keyword_penalty}" if keyword_penalty else label
-        if reason not in reasons:
-            reasons.append(reason)
-    for pattern, label in [
-        (r"\b(citizenship required|citizens only|must be a citizen)\b", "citizenship"),
-        (r"\b(must already be based|currently based)\b.{0,100}\b(singapore|hong kong)\b", "local required"),
-    ]:
-        match = re.search(pattern, text, flags=re.I)
-        if match:
-            reasons.append(label)
-    return _unique_reasons(reasons)
-
-
 def _has_severe_red_flag(job: dict[str, Any]) -> bool:
-    return bool(_severe_red_flag_reasons(job))
+    flags = _red_flags(job)
+    if flags & SEVERE_RED_FLAGS:
+        return True
+    text = _job_text(job)
+    title_text = str(job.get("title") or "").lower()
+    return bool(
+        re.search(r"\b(senior|sr\.?|staff|principal|lead)\b", title_text)
+        or re.search(r"\b(citizenship required|citizens only|must be a citizen)\b", text)
+        or re.search(r"\b(must already be based|currently based)\b.{0,100}\b(singapore|hong kong)\b", text)
+    )
 
 
 def _norm_company(value: Any) -> str:
@@ -444,6 +240,7 @@ def _priority_companies(config: dict[str, Any]) -> list[str]:
     if isinstance(priority, dict):
         for values in priority.values():
             names.extend(str(value) for value in _as_list(values))
+    names.extend(["JPM", "Goldman"])
     return [name for name in names if name.strip()]
 
 
@@ -475,35 +272,38 @@ def classify_campaign_job(job: dict[str, Any], config: dict[str, Any] | None = N
     campaign = _campaign_settings(config)
     thresholds = campaign.get("score_thresholds") or {}
     score = _score(job)
+    reasons: list[str] = []
     if _hard_skip(job):
-        reason = _short_free_text_reason(job.get("filter_reason") or "hard skip")
-        return {"application_effort": "skip", "campaign_reason": _format_campaign_reason(score, "skip", [reason])}
+        return {"application_effort": "skip", "campaign_reason": str(job.get("filter_reason") or "hard skip")}
     disqualified, disqualifier = _has_skip_disqualifier(job)
     if disqualified:
-        return {"application_effort": "skip", "campaign_reason": _format_campaign_reason(score, "skip", [disqualifier])}
+        return {"application_effort": "skip", "campaign_reason": f"skip disqualifier: {disqualifier}"}
     if score >= int(thresholds.get("deep_tailor") or 70):
         effort = "deep_tailor"
+        reasons.append(f"score {score} >= deep threshold")
     elif score >= int(thresholds.get("standard_tailor") or 55):
         effort = "standard_tailor"
+        reasons.append(f"score {score} in standard range")
     elif score >= int(thresholds.get("quick_apply") or 35):
         effort = "quick_apply"
+        reasons.append(f"score {score} in quick apply range")
     elif score >= int(thresholds.get("hold") or 25):
         effort = "hold"
+        reasons.append(f"score {score} in hold range")
     else:
         effort = "skip"
+        reasons.append(f"score {score} below hold threshold")
 
-    reasons = list(_campaign_penalty_reasons(job))
-    severe_reasons = _severe_red_flag_reasons(job)
-    reasons.extend(severe_reasons)
-    if effort == "deep_tailor" and severe_reasons:
+    if effort == "deep_tailor" and _has_severe_red_flag(job):
         effort = "standard_tailor"
+        reasons.append("severe red flag caps effort at standard_tailor")
     if effort == "standard_tailor" and is_priority_company(job.get("company") or job.get("canonical_company"), config):
-        if severe_reasons:
-            reasons.append("priority blocked")
+        if _has_severe_red_flag(job):
+            reasons.append("priority company found but severe red flag prevents promotion")
         else:
             effort = "deep_tailor"
-            reasons.append("priority")
-    return {"application_effort": effort, "campaign_reason": _format_campaign_reason(score, effort, reasons)}
+            reasons.append("priority company promoted standard_tailor to deep_tailor")
+    return {"application_effort": effort, "campaign_reason": "; ".join(reasons)}
 
 
 def choose_resume_profile(job: dict[str, Any], config: dict[str, Any] | None = None) -> str:
@@ -555,9 +355,7 @@ def profile_resume_source_path(resume_profile: str, profile_paths: dict[str, Any
     configured = _configured_profile_paths(resume_profile, profile_paths)
     value = configured.get("source") or configured.get("yaml")
     if not value and resume_profile:
-        local_source = TEMPLATES_DIR / "resume_profiles" / f"{resume_profile}.local.yaml"
-        example_source = TEMPLATES_DIR / "resume_profiles" / f"{resume_profile}.example.yaml"
-        value = str(local_source if local_source.exists() else example_source)
+        value = str(TEMPLATES_DIR / "resume_profiles" / f"{resume_profile}.yaml")
     if not value:
         return ""
     resolved = Path(value)
@@ -591,8 +389,9 @@ def build_campaign_row(
     resume_profile = choose_resume_profile(job, config)
     profile_path = profile_resume_path(resume_profile, profile_paths) if effort in {"deep_tailor", "standard_tailor", "quick_apply"} else ""
     estimated_minutes = int((settings.get("estimated_minutes") or {}).get(effort) or 0)
-    score = _score(job)
+    campaign_score = _score(job)
     hard_skip = _hard_skip(job) or effort == "skip"
+    campaign_score_band = str(job.get("score_band") or score_band(campaign_score, hard_skip=hard_skip))
     status = "queued"
     if effort == "hold":
         status = "moved_to_hold"
@@ -602,6 +401,8 @@ def build_campaign_row(
     allow_manual_generate_resume = _bool_setting(settings, "allow_manual_generate_resume", effort, fallback_key="resume_generation")
     auto_generate_answer_pack = _bool_setting(settings, "auto_generate_answer_pack", effort, fallback_key="answer_pack_generation")
     allow_manual_generate_answer_pack = _bool_setting(settings, "allow_manual_generate_answer_pack", effort, fallback_key="answer_pack_generation")
+    auto_generate_cover_letter = _bool_setting(settings, "auto_generate_cover_letter", effort)
+    allow_manual_generate_cover_letter = _bool_setting(settings, "allow_manual_generate_cover_letter", effort)
 
     return {
         "campaign_date": campaign_date,
@@ -613,19 +414,26 @@ def build_campaign_row(
         "profile_resume_path": profile_path,
         "tailored_resume_path": "",
         "answer_pack_path": "",
+        "cover_letter_path": "",
         "estimated_minutes": estimated_minutes,
         "auto_generate_resume": auto_generate_resume,
         "allow_manual_generate_resume": allow_manual_generate_resume,
         "auto_generate_answer_pack": auto_generate_answer_pack,
         "allow_manual_generate_answer_pack": allow_manual_generate_answer_pack,
+        "auto_generate_cover_letter": auto_generate_cover_letter,
+        "allow_manual_generate_cover_letter": allow_manual_generate_cover_letter,
         "should_generate_resume": auto_generate_resume,
         "should_generate_answer_pack": auto_generate_answer_pack,
+        "should_generate_cover_letter": auto_generate_cover_letter,
         "campaign_status": status,
         "selected_at": now_utc_iso(),
         "completed_at": "",
         "notes": "",
-        "score": score,
-        "score_band": str(job.get("score_band") or score_band(score, hard_skip=hard_skip)),
+        "campaign_score": campaign_score,
+        "campaign_score_band": campaign_score_band,
+        "campaign_job_updated_at": job.get("updated_at") or "",
+        "score": campaign_score,
+        "score_band": campaign_score_band,
         "recommendation": job.get("recommendation") or "",
         "title": job.get("title") or "",
         "company": job.get("company") or job.get("canonical_company") or "",
@@ -634,6 +442,8 @@ def build_campaign_row(
         "location": job.get("location") or "",
         "remote_type": job.get("remote_type") or "",
         "role_category": job.get("role_category") or "",
+        "role_family": job.get("role_family") or "",
+        "fit_category": job.get("fit_category") or "",
         "seniority": job.get("seniority") or "",
         "job_url": job.get("job_url") or "",
         "apply_url": job.get("application_apply_url") or job.get("apply_url") or job.get("job_url") or "",
@@ -785,6 +595,9 @@ def summarize_campaign(
 ) -> dict[str, Any]:
     counts = Counter(str(row.get("application_effort") or "") for row in rows)
     queued_rows = [row for row in rows if row.get("campaign_status") == "queued"]
+    actionable_rows = [row for row in rows if row.get("application_effort") in ACTIONABLE_EFFORTS and row.get("campaign_status") == "queued"]
+    by_role_family = Counter(str(row.get("role_family") or "unknown") for row in actionable_rows)
+    by_fit_category = Counter(str(row.get("fit_category") or "unknown") for row in actionable_rows)
     return {
         "total_items": len(rows),
         "deep_tailor": counts.get("deep_tailor", 0),
@@ -795,6 +608,8 @@ def summarize_campaign(
         "estimated_total_minutes": sum(int(row.get("estimated_minutes") or 0) for row in queued_rows),
         "already_applied_excluded": len(already_applied or []),
         "deferred": len(deferred or []),
+        "actionable_by_role_family": dict(sorted(by_role_family.items())),
+        "actionable_by_fit_category": dict(sorted(by_fit_category.items())),
     }
 
 
@@ -803,7 +618,7 @@ def _export_row(row: dict[str, Any]) -> dict[str, Any]:
     output["matched_keywords"] = list_to_cell(row.get("matched_keywords"))
     output["missing_keywords"] = list_to_cell(row.get("missing_keywords"))
     output["red_flags"] = list_to_cell(row.get("red_flags"))
-    for flag in ["auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack", "should_generate_resume", "should_generate_answer_pack"]:
+    for flag in ["auto_generate_resume", "allow_manual_generate_resume", "auto_generate_answer_pack", "allow_manual_generate_answer_pack", "auto_generate_cover_letter", "allow_manual_generate_cover_letter", "should_generate_resume", "should_generate_answer_pack", "should_generate_cover_letter"]:
         output[flag] = int(bool(row.get(flag)))
     return output
 
@@ -844,6 +659,8 @@ def write_campaign_excel(path: Path, result: dict[str, Any]) -> bool:
         ("Skip", [row for row in rows if row["application_effort"] == "skip"], CAMPAIGN_FIELDS),
         ("Already Applied", already, CAMPAIGN_FIELDS),
         ("By Resume Profile", _aggregate(rows, "resume_profile"), None),
+        ("By Role Family", _aggregate(rows, "role_family"), None),
+        ("By Fit Category", _aggregate(rows, "fit_category"), None),
         ("By Country", _aggregate(rows, "country"), None),
         ("By Company", _aggregate(rows, "company"), None),
     ]
@@ -864,6 +681,13 @@ def write_campaign_markdown(path: Path, result: dict[str, Any]) -> None:
     for key in ["deep_tailor", "standard_tailor", "quick_apply", "hold", "skip", "estimated_total_minutes", "already_applied_excluded", "deferred"]:
         lines.append(f"- {key}: {summary.get(key, 0)}")
     lines.append("")
+    for label, key in [("Role Family", "actionable_by_role_family"), ("Fit Category", "actionable_by_fit_category")]:
+        values = summary.get(key) or {}
+        if values:
+            lines.append(f"## Actionable By {label}")
+            for item, count in values.items():
+                lines.append(f"- {item}: {count}")
+            lines.append("")
     for effort, title in [
         ("deep_tailor", "Deep Tailor"),
         ("standard_tailor", "Standard Tailor"),
@@ -879,6 +703,7 @@ def write_campaign_markdown(path: Path, result: dict[str, Any]) -> None:
             continue
         for row in effort_rows:
             lines.append(f"- [{row.get('score')}] {row.get('company')} - {row.get('title')} ({row.get('country')})")
+            lines.append(f"  - Family: {row.get('role_family') or 'unknown'} | Fit: {row.get('fit_category') or 'unknown'}")
             lines.append(f"  - Resume profile: {row.get('resume_profile')} | Minutes: {row.get('estimated_minutes')}")
             lines.append(f"  - Reason: {row.get('campaign_reason')}")
             if row.get("apply_url"):
@@ -886,7 +711,6 @@ def write_campaign_markdown(path: Path, result: dict[str, Any]) -> None:
         lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
-
 
 def write_campaign_reports(result: dict[str, Any], output_dir: Path = REPORTS_DIR) -> dict[str, str]:
     date_part = str(result["campaign_date"])
@@ -908,12 +732,15 @@ def format_summary(result: dict[str, Any], paths: dict[str, str] | None = None) 
     lines.append(f"- estimated_total_minutes: {summary.get('estimated_total_minutes', 0)}")
     lines.append(f"- already_applied_excluded: {summary.get('already_applied_excluded', 0)}")
     lines.append(f"- deferred: {summary.get('deferred', 0)}")
+    for key in ["actionable_by_role_family", "actionable_by_fit_category"]:
+        values = summary.get(key) or {}
+        if values:
+            lines.append(f"- {key}: " + ", ".join(f"{item}={count}" for item, count in values.items()))
     if paths:
         for key, value in paths.items():
             if value:
                 lines.append(f"{key}: {value}")
     return "\n".join(lines)
-
 
 def _clean_date(value: str | None) -> str:
     if not value:

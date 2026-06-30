@@ -1,0 +1,34 @@
+﻿{
+  "manual_answer": "ANSWER MANUALLY",
+  "warning": "Sensitive identity, demographic, health, veteran, government ID, and financial questions must be reviewed and answered manually. This project never auto-fills or auto-submits those fields.",
+  "blocked_fields": [
+    "sin",
+    "social insurance number",
+    "social security number",
+    "passport",
+    "passport number",
+    "driver license",
+    "bank account",
+    "banking information",
+    "date of birth",
+    "birth date",
+    "medical",
+    "health condition",
+    "disability",
+    "race",
+    "ethnicity",
+    "gender",
+    "veteran",
+    "eeo",
+    "diversity"
+  ],
+  "manual_question_groups": {
+    "eeo": "ANSWER MANUALLY",
+    "diversity": "ANSWER MANUALLY",
+    "disability": "ANSWER MANUALLY",
+    "veteran_status": "ANSWER MANUALLY",
+    "government_id": "ANSWER MANUALLY",
+    "banking": "ANSWER MANUALLY",
+    "medical": "ANSWER MANUALLY"
+  }
+}

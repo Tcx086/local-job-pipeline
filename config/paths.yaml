@@ -1,0 +1,29 @@
+project_root: "."
+local_resources_dir: "local_resources"
+resources_dir: "resources"
+generated_dir: "generated"
+data_dir: "data"
+db_path: "data/db/job_pipeline.sqlite"
+
+legacy:
+  data_dir: "data"
+  legacy_db_path: "data/job_pipeline.sqlite"
+  legacy_resumes_dir: "data/resumes"
+  legacy_cover_letters_dir: "data/cover_letters"
+  legacy_apply_assist_dir: "data/apply_assist"
+  legacy_templates_dir: "templates"
+  legacy_config_dir: "config"
+
+resources:
+  candidate_master_profile: "local_resources/candidate/master_profile.yaml"
+  candidate_master_profile_example: "resources/candidate/master_profile.example.yaml"
+  common_answers: "resources/templates/answer_packs/common_answers.yaml"
+  cover_letter_human_templates: "resources/templates/cover_letters/human_templates.yaml"
+  cover_letter_configurable_templates: "resources/templates/cover_letters/configurable_templates.yaml"
+  sensitive_fields_policy: "resources/policies/sensitive_fields_policy.yaml"
+  role_profiles_dir: "local_resources/role_profiles"
+  role_profiles_examples_dir: "resources/role_profiles"
+
+generated:
+  reports_dir: "generated/reports"
+  profile_exports_dir: "generated/profile_exports"

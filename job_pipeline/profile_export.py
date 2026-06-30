@@ -5,11 +5,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .config_loader import load_path_with_fallback
-from .utils import CONFIG_DIR, DATA_DIR, RESUMES_DIR, TEMPLATES_DIR, now_utc_iso, write_json
+from .utils import CONFIG_DIR, DATA_DIR, RESUMES_DIR, TEMPLATES_DIR, load_yaml, now_utc_iso, write_json
 
 APPLY_ASSIST_DIR = DATA_DIR / "apply_assist"
-APPLY_PROFILE_PATH = CONFIG_DIR / "apply_profile.local.yaml"
+APPLY_PROFILE_PATH = CONFIG_DIR / "apply_profile.yaml"
 COMMON_ANSWERS_PATH = CONFIG_DIR / "common_answers.yaml"
 MASTER_RESUME_PATH = TEMPLATES_DIR / "master_resume.yaml"
 
@@ -54,7 +53,9 @@ FORBIDDEN_EXPORT_PATTERNS = [
 
 
 def _load(path: Path) -> dict[str, Any]:
-    data = load_path_with_fallback(path)
+    if not path.exists():
+        return {}
+    data = load_yaml(path)
     return data if isinstance(data, dict) else {}
 
 
@@ -93,7 +94,11 @@ def _skills(master: dict[str, Any]) -> list[str]:
 
 def _resume_paths() -> dict[str, Any]:
     generated = sorted(str(path) for path in RESUMES_DIR.rglob("*.pdf")) if RESUMES_DIR.exists() else []
-    return {"generated_pdf": generated}
+    return {
+        "master_docx": str(TEMPLATES_DIR / "master_resume_source.docx"),
+        "master_pdf": str(TEMPLATES_DIR / "master_resume_source.pdf"),
+        "generated_pdf": generated,
+    }
 
 
 def _render_markdown(export: dict[str, Any]) -> str:
@@ -169,7 +174,7 @@ def export_profile(
         "standard_answers": standard_answers,
         "skills": _skills(master),
         "resume_file_paths": _resume_paths(),
-        "source_note": "Generated from local apply-profile, common-answer, and master-resume config files with public examples as fallbacks.",
+        "source_note": "Generated from local config/apply_profile.yaml, config/common_answers.yaml, and templates/master_resume.yaml.",
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "profile_export.json"

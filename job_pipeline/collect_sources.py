@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .collect_jobspy import collect_jobs
-from .query_expander import build_search_config, get_search_mode
+from .query_expander import build_search_config, get_search_mode, role_family_for_query
 from .search_url_builder import generate_manual_search_urls
 
 
@@ -28,6 +28,7 @@ def _failed_attempts_to_errors(attempts: list[dict[str, Any]]) -> list[dict[str,
                 "source": attempt.get("source") or "jobspy",
                 "query": attempt.get("query") or "unknown",
                 "location": attempt.get("location") or "unknown",
+                "role_family": attempt.get("role_family") or role_family_for_query(str(attempt.get("query") or "")) or "unknown",
                 "error_message": attempt.get("error_message") or "unknown collection error",
             }
         )
@@ -46,7 +47,8 @@ def collect_jobspy_from_config(
     errors: list[dict[str, Any]] = []
     query_attempts: list[dict[str, Any]] = []
 
-    def collect_one(country: str, query: str, location: str) -> None:
+    def collect_one(country: str, query: str, location: str, role_family: str = "") -> None:
+        role_family = role_family or role_family_for_query(query)
         try:
             collected, attempts = collect_jobs(
                 search_terms=[query],
@@ -59,6 +61,7 @@ def collect_jobspy_from_config(
                 linkedin_fetch_description=bool(settings.get("linkedin_fetch_description", False)),
                 verbose=int(settings.get("verbose", 1)),
                 run_id=run_id,
+                role_family=role_family,
                 return_attempts=True,
             )
             rows.extend(collected)
@@ -75,6 +78,7 @@ def collect_jobspy_from_config(
                     "country": country,
                     "query": query,
                     "location": location,
+                    "role_family": role_family,
                     "raw_count": 0,
                     "success": False,
                     "error_message": str(exc),
@@ -86,11 +90,17 @@ def collect_jobspy_from_config(
         exact_pairs = payload.get("query_location_pairs") or []
         if exact_pairs:
             for pair in exact_pairs:
-                collect_one(country, str(pair.get("query") or ""), str(pair.get("location") or ""))
+                if isinstance(pair, dict):
+                    collect_one(
+                        country,
+                        str(pair.get("query") or ""),
+                        str(pair.get("location") or ""),
+                        str(pair.get("role_family") or ""),
+                    )
             continue
         for query in payload.get("search_terms", []) or ["configured_search_terms"]:
             for location in payload.get("locations", []) or ["configured_locations"]:
-                collect_one(country, str(query), str(location))
+                collect_one(country, str(query), str(location), role_family_for_query(str(query)))
     return rows, errors, query_attempts
 
 
@@ -110,7 +120,7 @@ def collect_sources(
     source_sites: list[str] | str | None = None,
     no_rotation: bool = False,
 ) -> CollectionResult:
-    mode_settings = get_search_mode(mode)
+    settings = get_search_mode(mode)
     search_config = build_search_config(
         mode,
         max_queries=max_queries,
@@ -121,11 +131,10 @@ def collect_sources(
         source_sites=source_sites,
         no_rotation=no_rotation,
     )
-    config_settings = search_config.get("settings") or {}
     jobspy_rows, errors, query_attempts = collect_jobspy_from_config(
         search_config,
-        hours_old=hours_old if hours_old is not None else int(config_settings.get("hours_old") or mode_settings["days_back"] * 24),
-        results_wanted=results_wanted if results_wanted is not None else int(config_settings.get("results_wanted") or mode_settings["results_wanted_per_query"]),
+        hours_old=hours_old or settings["days_back"] * 24,
+        results_wanted=results_wanted or settings["results_wanted_per_query"],
         run_id=run_id,
     )
     ats_rows: list[dict[str, Any]] = []
@@ -136,7 +145,7 @@ def collect_sources(
 
             ats_rows, manual_pages = collect_public_ats_jobs(load_ats_config(), source=ats_source)
         except Exception as exc:  # noqa: BLE001
-            errors.append({"country": "unknown", "source": "ats", "query": ats_source, "location": "all_active", "error_message": str(exc)})
+            errors.append({"country": "unknown", "source": "ats", "query": ats_source, "location": "all_active", "role_family": "unknown", "error_message": str(exc)})
     manual_search_urls = generate_manual_search_urls(mode=mode, search_config=search_config)
     return CollectionResult(
         jobs=jobspy_rows + ats_rows,

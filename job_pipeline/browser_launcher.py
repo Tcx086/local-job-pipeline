@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import webbrowser
@@ -9,7 +9,8 @@ from urllib.parse import urlparse
 from .utils import DATA_DIR, PROJECT_ROOT, RESUMES_DIR, TEMPLATES_DIR
 
 SAFE_URL_SCHEMES = {"http", "https"}
-ALLOWED_LOCAL_DIRS = [RESUMES_DIR, DATA_DIR / "apply_assist", TEMPLATES_DIR]
+GENERATED_DIR = PROJECT_ROOT / "generated"
+ALLOWED_LOCAL_DIRS = [RESUMES_DIR, DATA_DIR / "apply_assist", TEMPLATES_DIR, GENERATED_DIR]
 
 
 def safe_url(value: Any) -> str:
@@ -57,14 +58,25 @@ def _resolve_local_path(path: Any) -> Path | None:
     return None
 
 
+def _open_local_path(path: Path) -> bool:
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return True
+    return bool(webbrowser.open(path.as_uri(), new=2))
+
+
 def open_resume_file(path: Any) -> bool:
     resume_path = _resolve_local_path(path)
     if not resume_path or not resume_path.exists() or not resume_path.is_file():
         return False
-    if os.name == "nt":
-        os.startfile(str(resume_path))  # type: ignore[attr-defined]
-        return True
-    return bool(webbrowser.open(resume_path.as_uri(), new=2))
+    return _open_local_path(resume_path)
+
+
+def open_application_folder(path: Any) -> bool:
+    folder = _resolve_local_path(path)
+    if not folder or not folder.exists() or not folder.is_dir():
+        return False
+    return _open_local_path(folder)
 
 
 def read_local_text(path: Any) -> str:

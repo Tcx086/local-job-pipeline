@@ -1,4 +1,8 @@
-﻿{
-  "statuses": ["new", "reviewed", "apply_today", "applied", "interview", "rejected", "archived", "skipped"],
-  "country_priority": ["Remote"]
+{
+  "default_score_min": 35,
+  "high_score_threshold": 70,
+  "must_apply_threshold": 85,
+  "country_priority": ["Canada", "Singapore", "Hong Kong", "Remote"],
+  "freshness_priority": ["new_today", "new_this_week", "recent", "unknown", "old"],
+  "statuses": ["new", "reviewed", "apply_today", "applied", "interview", "rejected", "archived", "skipped"]
 }

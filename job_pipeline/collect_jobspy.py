@@ -12,7 +12,8 @@ from .utils import STANDARD_FIELDS, normalize_space, now_utc_iso, stable_id, str
 DEFAULT_SITES = ["indeed", "linkedin", "google", "glassdoor", "zip_recruiter"]
 INDEED_COUNTRY_MAP = {
     "Canada": "Canada",
-    "United States": "USA",
+    "Singapore": "Singapore",
+    "Hong Kong": "Hong Kong",
 }
 
 
@@ -79,6 +80,7 @@ def _query_attempt(
     raw_count: int,
     success: bool,
     error_message: str = "",
+    role_family: str = "",
 ) -> dict[str, Any]:
     return {
         "run_id": run_id,
@@ -86,6 +88,7 @@ def _query_attempt(
         "country": country,
         "query": query,
         "location": location,
+        "role_family": role_family,
         "raw_count": int(raw_count),
         "success": bool(success),
         "error_message": error_message,
@@ -98,6 +101,7 @@ def standardize_jobspy_row(
     search_term: str,
     requested_country: str,
     collected_at: str,
+    role_family: str = "",
 ) -> dict[str, Any]:
     source = _row_get(row, "site", "source")
     title = _row_get(row, "title")
@@ -123,6 +127,7 @@ def standardize_jobspy_row(
         "apply_url": apply_url,
         "description": description,
         "search_term_used": search_term,
+        "role_family": role_family,
         "collected_at": collected_at,
     }
 
@@ -139,6 +144,7 @@ def collect_jobs(
     linkedin_fetch_description: bool = False,
     verbose: int = 1,
     run_id: str = "",
+    role_family: str = "",
     return_attempts: bool = False,
 ) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Collect public jobs through JobSpy without proxy/login bypass behavior."""
@@ -175,6 +181,7 @@ def collect_jobs(
                             country=country,
                             query=term,
                             location=location,
+                            role_family=role_family,
                             raw_count=0,
                             success=False,
                             error_message=str(exc),
@@ -193,6 +200,7 @@ def collect_jobs(
                     search_term=term,
                     requested_country=country,
                     collected_at=collected_at,
+                    role_family=role_family,
                 )
                 standardized["search_location_used"] = location
                 output.append(standardized)
@@ -209,6 +217,7 @@ def collect_jobs(
                             country=country,
                             query=term,
                             location=location,
+                            role_family=role_family,
                             raw_count=counts_by_source.get(source, 0),
                             success=True,
                         )
@@ -224,7 +233,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Collect jobs with python-jobspy.")
     parser.add_argument("--term", action="append", required=True, help="Search term; repeatable.")
     parser.add_argument("--location", action="append", required=True, help="Location; repeatable.")
-    parser.add_argument("--country", required=True, help="Country label, for example Canada or United States.")
+    parser.add_argument("--country", required=True, choices=["Canada", "Singapore", "Hong Kong"])
     parser.add_argument("--hours-old", type=int, default=24)
     parser.add_argument("--results-wanted", type=int, default=25)
     parser.add_argument("--out", type=Path, default=Path("data/raw/jobspy_jobs.csv"))

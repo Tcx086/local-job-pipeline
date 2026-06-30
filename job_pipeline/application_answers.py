@@ -5,14 +5,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config_loader import load_path_with_fallback
 from .database import DEFAULT_DB, get_job_detail
 from .keyword_extract import extract_keywords
+from .resources import load_candidate_master, load_common_answers, load_sensitive_policy
 from .utils import CONFIG_DIR, DATA_DIR, TEMPLATES_DIR, flatten_text, load_yaml, now_utc_iso, slugify, write_json
+from .workspace import ApplicationWorkspace, PathRegistry
+from .workspace.artifacts import write_workspace_source_files
 
 APPLY_ASSIST_DIR = DATA_DIR / "apply_assist"
 MASTER_RESUME_PATH = TEMPLATES_DIR / "master_resume.yaml"
-APPLY_PROFILE_PATH = CONFIG_DIR / "apply_profile.local.yaml"
+APPLY_PROFILE_PATH = CONFIG_DIR / "apply_profile.yaml"
 COMMON_ANSWERS_PATH = CONFIG_DIR / "common_answers.yaml"
 SENSITIVE_POLICY_PATH = CONFIG_DIR / "sensitive_fields_policy.yaml"
 MANUAL_ANSWER = "ANSWER MANUALLY"
@@ -27,7 +29,9 @@ def answer_pack_paths(canonical_job_id: str, output_dir: Path = APPLY_ASSIST_DIR
 
 
 def _load_config(path: Path) -> dict[str, Any]:
-    data = load_path_with_fallback(path)
+    if not path.exists():
+        return {}
+    data = load_yaml(path)
     return data if isinstance(data, dict) else {}
 
 
@@ -82,17 +86,14 @@ def _skills_from_master(master: dict[str, Any]) -> list[str]:
 
 def _build_work_authorization(country: Any, profile: dict[str, Any], common_answers: dict[str, Any]) -> str:
     key = _country_key(country)
-    templates = [f"work_authorization_{key}", "work_authorization_default"]
-    profile_auth = profile.get("work_authorization") or {}
-    profile_payload = profile_auth.get(key) if isinstance(profile_auth, dict) else {}
-    if not isinstance(profile_payload, dict):
-        profile_payload = profile_auth.get("default") if isinstance(profile_auth, dict) else {}
-    for template_key in templates:
-        answer = _template(common_answers, template_key)
-        if answer:
-            return answer
-    if isinstance(profile_payload, dict) and profile_payload.get("explanation"):
-        return str(profile_payload.get("explanation"))
+    if key == "canada":
+        return _template(common_answers, "work_authorization_canada") or str(
+            ((profile.get("work_authorization") or {}).get("canada") or {}).get("explanation") or ""
+        )
+    if key in {"singapore", "hong_kong"}:
+        return _template(common_answers, "work_authorization_singapore_hk") or str(
+            ((profile.get("work_authorization") or {}).get(key) or {}).get("explanation") or ""
+        )
     return "TODO: Confirm work authorization requirements for this location before answering."
 
 
@@ -127,9 +128,19 @@ def _talking_points(master: dict[str, Any], keywords: list[str]) -> list[str]:
 
 
 def _dict_items(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        items: list[dict[str, Any]] = []
+        for key, item in value.items():
+            if not isinstance(item, dict):
+                continue
+            row = dict(item)
+            row.setdefault("id", str(key))
+            row.setdefault("name", row.get("title") or str(key).replace("_", " ").title())
+            items.append(row)
+        return items
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    return []
 
 def _render_project_summary(projects: list[dict[str, Any]]) -> str:
     if not projects:
@@ -231,16 +242,19 @@ def generate_answer_pack(
     job: dict[str, Any],
     *,
     generated_resume_file: str = "",
-    output_dir: Path = APPLY_ASSIST_DIR,
-    master_resume_path: Path = MASTER_RESUME_PATH,
+    output_dir: Path | None = None,
+    master_resume_path: Path | None = None,
     apply_profile_path: Path = APPLY_PROFILE_PATH,
-    common_answers_path: Path = COMMON_ANSWERS_PATH,
-    sensitive_policy_path: Path = SENSITIVE_POLICY_PATH,
+    common_answers_path: Path | None = None,
+    sensitive_policy_path: Path | None = None,
+    path_registry: PathRegistry | None = None,
+    workspace_date: str | None = None,
 ) -> dict[str, Any]:
-    master = _load_config(master_resume_path)
+    registry = path_registry or PathRegistry.from_project_root()
+    master = _load_config(master_resume_path) if master_resume_path is not None else load_candidate_master(registry)
     profile = _load_config(apply_profile_path)
-    common_answers = _load_config(common_answers_path)
-    policy = _load_config(sensitive_policy_path)
+    common_answers = _load_config(common_answers_path) if common_answers_path is not None else load_common_answers(registry)
+    policy = _load_config(sensitive_policy_path) if sensitive_policy_path is not None else load_sensitive_policy(registry)
     resume_text = flatten_text(master)
     description = str(job.get("description") or "")
     keyword_info = extract_keywords(description, resume_text)
@@ -287,6 +301,22 @@ def generate_answer_pack(
             "Do not let any tool click submit automatically.",
         ],
     }
+    if output_dir is None:
+        workspace = ApplicationWorkspace.from_job(job, paths=registry, date=workspace_date)
+        write_workspace_source_files(workspace, job)
+        paths = {
+            "markdown": workspace.answer_pack_md_path(),
+            "json": workspace.answer_pack_json_path(),
+            "workspace": workspace.root,
+            "manifest": workspace.manifest_path,
+        }
+        write_json(paths["json"], pack)
+        paths["markdown"].write_text(_render_markdown(pack), encoding="utf-8")
+        manifest = workspace.write_manifest()
+        pack["paths"] = {key: str(value) for key, value in paths.items()}
+        pack["manifest"] = manifest
+        return pack
+
     paths = answer_pack_paths(canonical_job_id, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(paths["json"], pack)
@@ -295,25 +325,50 @@ def generate_answer_pack(
     return pack
 
 
-def load_answer_pack(canonical_job_id: str, output_dir: Path = APPLY_ASSIST_DIR) -> dict[str, Any] | None:
+def _read_answer_pack(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def load_answer_pack(canonical_job_id: str, output_dir: Path | None = None) -> dict[str, Any] | None:
+    if output_dir is None:
+        generated_dir = PathRegistry.from_project_root().generated_dir
+        if generated_dir.exists():
+            matches = sorted(
+                generated_dir.rglob("source/answer_pack.json"),
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            for path in matches:
+                payload = _read_answer_pack(path)
+                meta = payload.get("metadata") if isinstance(payload, dict) else {}
+                if str((meta or {}).get("canonical_job_id") or "") == str(canonical_job_id):
+                    payload.setdefault("paths", {})
+                    payload["paths"].setdefault("json", str(path))
+                    payload["paths"].setdefault("markdown", str(path.parents[1] / "answer_pack.md"))
+                    return payload
+        output_dir = APPLY_ASSIST_DIR
     path = answer_pack_paths(canonical_job_id, output_dir)["json"]
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
+    return _read_answer_pack(path)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate an Apply Assist answer pack for one job.")
     parser.add_argument("--job-id", required=True, help="canonical_job_id from the SQLite jobs table")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
-    parser.add_argument("--out", type=Path, default=APPLY_ASSIST_DIR)
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
     job = get_job_detail(args.job_id, args.db)
     if not job:
         raise SystemExit(f"Unknown canonical_job_id: {args.job_id}")
     pack = generate_answer_pack(job, generated_resume_file=str(job.get("resume_used") or job.get("tailored_resume_path") or job.get("profile_resume_path") or job.get("scheduler_resume_draft_path") or job.get("resume_file_generated") or ""), output_dir=args.out)
-    print(pack["paths"]["markdown"])
-    print(pack["paths"]["json"])
+    paths = pack.get("paths") or {}
+    for key in ["workspace", "markdown", "json"]:
+        print(f"{key}: {paths.get(key) or 'not created'}")
     return 0
 
 

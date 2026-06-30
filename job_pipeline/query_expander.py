@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from .search_scope import SearchScopeError, load_search_scope, search_scope_to_search_config
 from .utils import CONFIG_DIR, load_yaml, stable_id, today_yyyymmdd
 
 EXPANDED_QUERIES_PATH = CONFIG_DIR / "expanded_queries.yaml"
+ROLE_FAMILIES_PATH = CONFIG_DIR / "role_families.yaml"
 SEARCH_MODES_PATH = CONFIG_DIR / "search_modes.yaml"
 
 MODE_NAMES = {"strict", "normal", "broad", "backfill"}
 COUNTRY_LABELS = {
     "canada": "Canada",
-    "united_states": "United States",
+    "singapore": "Singapore",
+    "hong_kong": "Hong Kong",
 }
 DEFAULT_SOURCE_SITES = ["indeed", "linkedin", "google", "glassdoor", "zip_recruiter"]
 DEFAULT_REPORTING_CONFIG = {
@@ -29,6 +31,19 @@ DEFAULT_ROTATION_CONFIG = {
     "daily_query_location_pairs": {"normal": 80, "broad": 120, "backfill": 160},
     "strategy": "stable_hash_by_date",
 }
+DEFAULT_ROLE_FAMILY_SETTINGS = {
+    "enabled_families": [],
+    "mode_families": {
+        "strict": ["digital_assets_research", "financial_data_analysis", "risk_fraud_compliance"],
+        "normal": ["digital_assets_research", "financial_data_analysis", "risk_fraud_compliance", "technical_operations", "banking_operations"],
+        "broad": ["digital_assets_research", "financial_data_analysis", "risk_fraud_compliance", "technical_operations", "banking_operations", "ai_data_governance"],
+        "backfill": ["digital_assets_research", "financial_data_analysis", "risk_fraud_compliance", "technical_operations", "banking_operations", "ai_data_governance"],
+    },
+    "max_terms_per_family": {"strict": 8, "normal": 9, "broad": 11, "backfill": 11},
+    "max_role_families_per_run": {"strict": 3, "normal": 5, "broad": 6, "backfill": 6},
+}
+
+QueryPair = tuple[str, str, str, str]
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -106,6 +121,36 @@ def load_expanded_queries(path: Path = EXPANDED_QUERIES_PATH) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def load_role_families(path: Path = ROLE_FAMILIES_PATH) -> dict[str, Any]:
+    data = load_yaml(path) or {}
+    return data if isinstance(data, dict) else {}
+
+
+def _role_family_settings(role_config: dict[str, Any]) -> dict[str, Any]:
+    settings = dict(DEFAULT_ROLE_FAMILY_SETTINGS)
+    settings["mode_families"] = dict(DEFAULT_ROLE_FAMILY_SETTINGS["mode_families"])
+    settings["max_terms_per_family"] = dict(DEFAULT_ROLE_FAMILY_SETTINGS["max_terms_per_family"])
+    settings["max_role_families_per_run"] = dict(DEFAULT_ROLE_FAMILY_SETTINGS["max_role_families_per_run"])
+    overlay = role_config.get("settings") if isinstance(role_config.get("settings"), dict) else {}
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(settings.get(key), dict):
+            settings[key].update(value)
+        else:
+            settings[key] = value
+    return settings
+
+
+def _family_payloads(role_config: dict[str, Any]) -> dict[str, Any]:
+    families = role_config.get("families") if isinstance(role_config.get("families"), dict) else {}
+    return families if isinstance(families, dict) else {}
+
+
+def _family_terms(payload: dict[str, Any], *, max_terms: int | None = None) -> list[str]:
+    terms = payload.get("search_terms") or payload.get("base_titles") or []
+    output = _dedupe([str(item) for item in terms])
+    return output[:max_terms] if max_terms and max_terms > 0 else output
+
+
 def _base_titles(config: dict[str, Any], query_family: str | None = None) -> list[str]:
     families = config.get("role_families") or {}
     if query_family:
@@ -128,38 +173,152 @@ def _mode_modifiers(config: dict[str, Any], mode: str) -> list[str]:
     return _dedupe([str(item) for item in config.get("industry_modifiers") or []])
 
 
-def expand_queries(
+def _selected_role_families(
+    mode: str,
+    *,
+    role_config: dict[str, Any],
+    legacy_config: dict[str, Any],
+    query_family: str | None = None,
+) -> tuple[list[str], bool]:
+    families = _family_payloads(role_config)
+    legacy_families = legacy_config.get("role_families") if isinstance(legacy_config.get("role_families"), dict) else {}
+    if query_family:
+        if query_family in families:
+            return [query_family], False
+        if query_family in legacy_families:
+            return [query_family], True
+        expected = sorted(set(families) | set(legacy_families))
+        raise ValueError(f"Unknown query family: {query_family}. Expected one of {expected}")
+    if not families:
+        return list(legacy_families), True
+
+    settings = _role_family_settings(role_config)
+    enabled = [str(item) for item in settings.get("enabled_families") or families.keys()]
+    mode_families = [str(item) for item in (settings.get("mode_families") or {}).get(mode, enabled)]
+    selected = [family for family in mode_families if family in families and family in enabled]
+    max_families = int((settings.get("max_role_families_per_run") or {}).get(mode) or 0)
+    return (selected[:max_families] if max_families > 0 else selected), False
+
+
+def _dedupe_specs(items: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    output: list[dict[str, str]] = []
+    for item in items:
+        query = " ".join(str(item.get("query") or "").split())
+        marker = query.lower()
+        if not query or marker in seen:
+            continue
+        seen.add(marker)
+        output.append({"query": query, "role_family": str(item.get("role_family") or "")})
+    return output
+
+
+def expand_query_specs(
     mode: str = "normal",
     *,
     config: dict[str, Any] | None = None,
+    role_config: dict[str, Any] | None = None,
     max_queries: int | None = None,
     query_family: str | None = None,
-) -> list[str]:
-    """Build role-family queries for a search mode without mutating config."""
+) -> list[dict[str, str]]:
+    """Build search queries with role-family metadata while preserving bounded modes."""
     mode = str(mode or "normal").lower()
     if mode not in MODE_NAMES:
         raise ValueError(f"Unknown search mode: {mode}")
     config = config or load_expanded_queries()
-    bases = _base_titles(config, query_family=query_family)
+    role_config = role_config or load_role_families()
+    selected_families, use_legacy = _selected_role_families(
+        mode,
+        role_config=role_config,
+        legacy_config=config,
+        query_family=query_family,
+    )
     modifiers = _mode_modifiers(config, mode)
-    queries: list[str] = list(bases)
+    specs: list[dict[str, str]] = []
 
+    if use_legacy:
+        bases = _base_titles(config, query_family=query_family)
+        base_specs = [{"query": title, "role_family": query_family or ""} for title in bases]
+    else:
+        settings = _role_family_settings(role_config)
+        max_terms = int((settings.get("max_terms_per_family") or {}).get(mode) or 0)
+        families = _family_payloads(role_config)
+        base_specs = []
+        for family in selected_families:
+            for term in _family_terms(families.get(family) or {}, max_terms=max_terms):
+                base_specs.append({"query": term, "role_family": family})
+
+    specs.extend(base_specs)
     if mode in {"normal", "broad", "backfill"}:
-        for title in bases:
-            for modifier in modifiers:
-                marker = modifier.lower()
-                if marker in title.lower():
+        for modifier in modifiers:
+            marker = modifier.lower()
+            for item in base_specs:
+                query = item["query"]
+                if marker in query.lower():
                     continue
-                queries.append(f"{title} {modifier}")
+                specs.append({"query": f"{query} {modifier}", "role_family": item.get("role_family", "")})
 
     if mode == "backfill" and not query_family:
-        queries.extend(str(item) for item in config.get("generic_backfill_terms") or [])
-        for item in config.get("generic_backfill_terms") or []:
+        generic_terms = [str(item) for item in config.get("generic_backfill_terms") or []]
+        specs.extend({"query": item, "role_family": role_family_for_query(item, role_config=role_config, config=config)} for item in generic_terms)
+        for item in generic_terms:
             for modifier in modifiers[:8]:
-                queries.append(f"{item} {modifier}")
+                specs.append(
+                    {
+                        "query": f"{item} {modifier}",
+                        "role_family": role_family_for_query(item, role_config=role_config, config=config),
+                    }
+                )
 
-    deduped = _dedupe(queries)
+    deduped = _dedupe_specs(specs)
     return deduped[:max_queries] if max_queries else deduped
+
+
+def expand_queries(
+    mode: str = "normal",
+    *,
+    config: dict[str, Any] | None = None,
+    role_config: dict[str, Any] | None = None,
+    max_queries: int | None = None,
+    query_family: str | None = None,
+) -> list[str]:
+    """Build role-family queries for a search mode without mutating config."""
+    return [
+        item["query"]
+        for item in expand_query_specs(
+            mode,
+            config=config,
+            role_config=role_config,
+            max_queries=max_queries,
+            query_family=query_family,
+        )
+    ]
+
+
+def role_family_for_query(
+    query: str,
+    *,
+    role_config: dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
+) -> str:
+    query_text = " ".join(str(query or "").lower().split())
+    if not query_text:
+        return ""
+    role_config = role_config or load_role_families()
+    config = config or load_expanded_queries()
+    for family, payload in _family_payloads(role_config).items():
+        for term in _family_terms(payload):
+            marker = term.lower()
+            if query_text == marker or query_text.startswith(f"{marker} "):
+                return str(family)
+    for family, payload in (config.get("role_families") or {}).items():
+        if not isinstance(payload, dict):
+            continue
+        for term in _family_terms(payload):
+            marker = term.lower()
+            if query_text == marker or query_text.startswith(f"{marker} "):
+                return str(family)
+    return ""
 
 
 def location_groups(config: dict[str, Any] | None = None) -> dict[str, list[str]]:
@@ -187,30 +346,40 @@ def _country_filter(countries: list[str] | str | None) -> set[str] | None:
     return normalized or None
 
 
-def _pairs_from_config(config: dict[str, Any]) -> list[tuple[str, str, str]]:
-    pairs: list[tuple[str, str, str]] = []
+def _pairs_from_config(config: dict[str, Any]) -> list[QueryPair]:
+    pairs: list[QueryPair] = []
     for country, payload in (config.get("countries") or {}).items():
         exact_pairs = payload.get("query_location_pairs") or []
         if exact_pairs:
             for item in exact_pairs:
                 if isinstance(item, dict):
-                    pairs.append((str(country), str(item.get("query") or ""), str(item.get("location") or "")))
+                    pairs.append(
+                        (
+                            str(country),
+                            str(item.get("query") or ""),
+                            str(item.get("location") or ""),
+                            str(item.get("role_family") or ""),
+                        )
+                    )
             continue
         for query in payload.get("search_terms") or []:
             for location in payload.get("locations") or []:
-                pairs.append((str(country), str(query), str(location)))
+                pairs.append((str(country), str(query), str(location), role_family_for_query(str(query))))
     return pairs
 
 
-def _config_from_pairs(base_config: dict[str, Any], pairs: list[tuple[str, str, str]]) -> dict[str, Any]:
+def _config_from_pairs(base_config: dict[str, Any], pairs: list[QueryPair]) -> dict[str, Any]:
     countries: dict[str, dict[str, Any]] = {}
-    for country, query, location in pairs:
+    for country, query, location, role_family in pairs:
         payload = countries.setdefault(country, {"search_terms": [], "locations": [], "query_location_pairs": []})
         if query not in payload["search_terms"]:
             payload["search_terms"].append(query)
         if location not in payload["locations"]:
             payload["locations"].append(location)
-        payload["query_location_pairs"].append({"query": query, "location": location})
+        pair = {"query": query, "location": location}
+        if role_family:
+            pair["role_family"] = role_family
+        payload["query_location_pairs"].append(pair)
     return {"settings": dict(base_config.get("settings") or {}), "countries": countries}
 
 
@@ -227,10 +396,10 @@ def _date_value(value: str | date | None = None) -> date:
     return datetime.strptime(today_yyyymmdd(), "%Y%m%d").date()
 
 
-def rotate_query_location_pairs(pairs: list[tuple[str, str, str]], *, mode: str, rotation_date: str | date | None = None, limit: int | None = None) -> list[tuple[str, str, str]]:
+def rotate_query_location_pairs(pairs: list[QueryPair], *, mode: str, rotation_date: str | date | None = None, limit: int | None = None) -> list[QueryPair]:
     if not limit or limit <= 0 or len(pairs) <= limit:
         return list(pairs)
-    ordered = sorted(pairs, key=lambda item: stable_id(item[0], item[1], item[2]))
+    ordered = sorted(pairs, key=lambda item: stable_id(*item))
     day = _date_value(rotation_date)
     offset = (day.toordinal() * limit) % len(ordered)
     return [ordered[(offset + idx) % len(ordered)] for idx in range(limit)]
@@ -257,30 +426,15 @@ def build_search_config(
     no_rotation: bool = False,
     rotation_date: str | date | None = None,
 ) -> dict[str, Any]:
-    if expanded_config is None:
-        try:
-            scope = load_search_scope()
-            return search_scope_to_search_config(
-                scope,
-                mode=mode,
-                max_queries=max_queries,
-                max_locations=max_locations,
-                max_query_location_pairs=max_query_location_pairs,
-                country=country,
-                source_sites=source_sites,
-            )
-        except FileNotFoundError:
-            pass
-        except SearchScopeError:
-            raise
-
     settings = get_search_mode(mode, modes_path)
     expanded_config = expanded_config or load_expanded_queries()
     query_limit = max_queries if max_queries is not None else int(settings.get("max_queries_per_country") or 0) or None
-    queries = expand_queries(settings["name"], config=expanded_config, max_queries=query_limit, query_family=query_family)
+    query_specs = expand_query_specs(settings["name"], config=expanded_config, max_queries=query_limit, query_family=query_family)
+    queries = [item["query"] for item in query_specs]
     groups = location_groups(expanded_config)
     allowed_countries = _country_filter(country)
     countries: dict[str, dict[str, Any]] = {}
+    pairs: list[QueryPair] = []
     for country_name, locations in groups.items():
         if allowed_countries and country_name not in allowed_countries:
             continue
@@ -289,6 +443,9 @@ def build_search_config(
             "locations": selected_locations,
             "search_terms": queries,
         }
+        for item in query_specs:
+            for location in selected_locations:
+                pairs.append((country_name, item["query"], location, item.get("role_family") or ""))
     base_config = {
         "settings": {
             "hours_old": settings["days_back"] * 24,
@@ -301,7 +458,6 @@ def build_search_config(
         "countries": countries,
     }
 
-    pairs = _pairs_from_config(base_config)
     rotation = load_rotation_config(modes_path)
     if not no_rotation and rotation.get("enabled") and mode in rotation.get("daily_query_location_pairs", {}):
         pairs = rotate_query_location_pairs(
@@ -320,12 +476,25 @@ def describe_search_plan(config: dict[str, Any], *, mode: str = "normal") -> dic
     source_sites = _source_site_list(settings.get("site_name"))
     countries = config.get("countries") or {}
     pairs_by_country = {}
+    role_families_by_country = {}
+    role_family_counts: Counter[str] = Counter()
     for country, payload in countries.items():
         exact_pairs = payload.get("query_location_pairs") or []
         if exact_pairs:
             pairs_by_country[country] = len(exact_pairs)
+            families = Counter(
+                str(pair.get("role_family") or role_family_for_query(str(pair.get("query") or "")) or "unknown")
+                for pair in exact_pairs
+                if isinstance(pair, dict)
+            )
         else:
             pairs_by_country[country] = len(payload.get("search_terms") or []) * len(payload.get("locations") or [])
+            families = Counter()
+            for query in payload.get("search_terms") or []:
+                family = role_family_for_query(str(query)) or "unknown"
+                families[family] += len(payload.get("locations") or [])
+        role_families_by_country[country] = dict(sorted(families.items()))
+        role_family_counts.update(families)
     total_pairs = sum(pairs_by_country.values())
     sleep_seconds = float(settings.get("sleep_seconds") or 0)
     return {
@@ -334,6 +503,8 @@ def describe_search_plan(config: dict[str, Any], *, mode: str = "normal") -> dic
         "queries": {country: len(payload.get("search_terms") or []) for country, payload in countries.items()},
         "locations": {country: len(payload.get("locations") or []) for country, payload in countries.items()},
         "query_location_pairs": pairs_by_country,
+        "role_families": role_families_by_country,
+        "role_family_query_location_pairs": dict(sorted(role_family_counts.items())),
         "total_query_location_pairs": total_pairs,
         "source_sites": source_sites,
         "estimated_external_calls": total_pairs * len(source_sites),
@@ -349,12 +520,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--query-family", default=None)
     args = parser.parse_args(argv)
     settings = get_search_mode(args.mode)
-    queries = expand_queries(
+    specs = expand_query_specs(
         args.mode,
         max_queries=args.max or int(settings.get("max_queries_per_country") or 0) or None,
         query_family=args.query_family,
     )
-    print(json.dumps({"mode": args.mode, "count": len(queries), "queries": queries}, ensure_ascii=False, indent=2))
+    print(json.dumps({"mode": args.mode, "count": len(specs), "queries": specs}, ensure_ascii=False, indent=2))
     return 0
 
 

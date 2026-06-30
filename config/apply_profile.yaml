@@ -1,0 +1,18 @@
+personal:
+  first_name: ""
+  last_name: ""
+  preferred_name: ""
+
+education: {}
+links: {}
+
+availability:
+  notice_period: "ANSWER MANUALLY"
+
+work_authorization:
+  canada:
+    explanation: "ANSWER MANUALLY"
+  singapore:
+    explanation: "ANSWER MANUALLY"
+  hong_kong:
+    explanation: "ANSWER MANUALLY"

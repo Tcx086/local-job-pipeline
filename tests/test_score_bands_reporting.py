@@ -21,6 +21,22 @@ class ScoreBandReportTests(unittest.TestCase):
         ])
         self.assertEqual(rows[0]["score_band"], "Review manually")
 
+
+    def test_report_rows_include_role_family_and_fit_category(self):
+        rows = prepare_report_rows([
+            {
+                "job_id": "job2",
+                "score": 72,
+                "title": "Fraud Analyst",
+                "company": "Example",
+                "location": "Toronto",
+                "country": "Canada",
+                "role_family": "risk_fraud_compliance",
+                "fit_category": "core_fit",
+            }
+        ])
+        self.assertEqual(rows[0]["role_family"], "risk_fraud_compliance")
+        self.assertEqual(rows[0]["fit_category"], "core_fit")
     def test_markdown_includes_top_review_candidates_below_55(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "top_jobs.md"
