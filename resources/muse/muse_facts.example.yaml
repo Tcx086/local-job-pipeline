@@ -1,0 +1,36 @@
+# Copy to local_resources/muse/muse_facts.yaml and replace fake values.
+# Never commit the private file.
+
+facts:
+  full_name: "Example Candidate"
+  location: "Toronto, ON"
+  phone: "000-000-0000"
+  email: "candidate@example.com"
+
+  canada_work_authorization:
+    status: "Example work authorization"
+    valid_until: "YYYY-MM"
+    sponsorship_required_now: false
+    # Leave future sponsorship ambiguous unless you can answer it truthfully.
+    sponsorship_required_future: null
+
+  us_business_travel:
+    permitted: false
+    documentation: ""
+    # This field must never be inferred from a visitor/business visa.
+    us_work_authorization: false
+
+  education:
+    degree: "Example Degree"
+    institution: "Example University"
+    graduation_date: "YYYY-MM"
+
+  preferences:
+    gta_onsite: true
+    canada_remote: true
+    travel_percent_max: 25
+
+preapproved_answers:
+  # Add only answers that are safe to reuse verbatim.
+  hybrid_2_days: true
+  background_check_standard: true
