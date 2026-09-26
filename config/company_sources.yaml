@@ -1,9 +1,12 @@
 {
   "Canada": [
     "RBC", "TD", "BMO", "CIBC", "Scotiabank", "National Bank", "Manulife", "Sun Life",
-    "Capital One Canada", "Wealthsimple", "TMX Group", "CI Financial", "Purpose Investments",
-    "Coinsquare", "WonderFi", "Chainalysis", "Coinbase Canada", "Stripe Canada", "Shopify",
-    "Thomson Reuters", "Morningstar Canada"
+    "Capital One Canada", "Wealthsimple", "Questrade", "Equitable Bank", "EQ Bank",
+    "TMX Group", "Cboe Canada", "Connor Clark & Lunn", "CPP Investments", "OMERS",
+    "HOOPP", "Ontario Teachers' Pension Plan", "Mackenzie Investments", "CI Financial", "Mawer",
+    "Purpose Investments", "goeasy", "Ratehub.ca", "Avenir Energy",
+    "Alpaca", "Mamoru", "Coinsquare", "WonderFi", "Chainalysis", "Coinbase Canada",
+    "Stripe Canada", "Shopify", "Thomson Reuters", "Morningstar Canada"
   ],
   "Singapore": [
     "Binance", "OKX", "Bybit", "Crypto.com", "Coinbase", "Gemini", "GSR", "Wintermute",
