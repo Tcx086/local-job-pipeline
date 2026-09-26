@@ -11,6 +11,13 @@
       "board_token": "coinbase",
       "country_focus": ["Canada", "Singapore", "Hong Kong"],
       "tags": ["crypto", "fintech", "data", "operations"]
+    },
+    {
+      "company_name": "Alpaca",
+      "board_token": "alpaca",
+      "country_focus": ["Canada", "Remote"],
+      "tags": ["brokerage", "trading_ops", "market_data", "fintech"],
+      "notes": "Official Greenhouse board; Alpaca states its distributed team includes Canada."
     }
   ],
   "lever": [
@@ -33,6 +40,18 @@
   ],
   "company_pages": [
     {"company_name": "Wealthsimple", "careers_url": "https://www.wealthsimple.com/en-ca/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["fintech", "data", "operations"]},
+    {"company_name": "Questrade", "careers_url": "https://www.questrade.com/about-us/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["brokerage", "trading_ops", "risk", "data"]},
+    {"company_name": "Equitable Bank / EQ Bank", "careers_url": "https://www.eqbank.ca/about-us/about/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "treasury", "risk", "data"]},
+    {"company_name": "goeasy", "careers_url": "https://goeasy.talentnest.com/en/jobs", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["consumer_finance", "risk", "analytics", "operations"]},
+    {"company_name": "Ratehub.ca", "careers_url": "https://ratehubinc.applytojob.com/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["fintech", "finance", "reconciliation", "operations"]},
+    {"company_name": "Mamoru", "careers_url": "https://careers.mamoru.com/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["trading", "blockchain", "execution", "market_data"]},
+    {"company_name": "Connor Clark & Lunn", "careers_url": "https://cclinvest.cclgroup.com/careers/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["asset_management", "trading_ops", "risk", "data"]},
+    {"company_name": "CPP Investments", "careers_url": "https://www.cppinvestments.com/career", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["institutional_investing", "risk", "data", "operations"]},
+    {"company_name": "OMERS", "careers_url": "https://careers.omers.com/ca/en", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["institutional_investing", "risk", "data", "operations"]},
+    {"company_name": "HOOPP", "careers_url": "https://hoopp.com/about-hoopp/hoopp-careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["institutional_investing", "risk", "data", "operations"]},
+    {"company_name": "Ontario Teachers' Pension Plan", "careers_url": "https://otpp.com/en-ca/careers/", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["institutional_investing", "risk", "data", "technology"]},
+    {"company_name": "Mackenzie Investments", "careers_url": "https://www.mackenzieinvestments.com/en/careers", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["asset_management", "risk", "data", "operations"]},
+    {"company_name": "CI Financial", "careers_url": "https://www.ci.com/cix", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["asset_management", "wealth", "risk", "data"]},
     {"company_name": "Chainalysis", "careers_url": "https://www.chainalysis.com/careers/", "adapter_type": "manual_url", "country_focus": ["Canada", "Singapore"], "tags": ["crypto", "data", "risk"]},
     {"company_name": "Stripe", "careers_url": "https://stripe.com/jobs", "adapter_type": "manual_url", "country_focus": ["Canada", "Singapore"], "tags": ["fintech", "api"]},
     {"company_name": "RBC", "careers_url": "https://jobs.rbc.com/ca/en", "adapter_type": "manual_url", "country_focus": ["Canada"], "tags": ["bank", "capital_markets", "risk"]},
