@@ -51,7 +51,7 @@ applications:
     evidence:
       - message_id: msg-reject
         thread_id: thread-1
-        subject: Re: Execution Trader
+        subject: "Re: Execution Trader"
         date: 2026-08-18
 """.strip()
         + "\n",
