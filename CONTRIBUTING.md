@@ -20,7 +20,6 @@ Do not commit real resumes, generated resumes, SQLite databases, application rec
 
 ```powershell
 python -B -m pytest
-python -B -m job_pipeline.setup_wizard --dry-run
 python -B -m job_pipeline.scheduler --run-once --sample
 python -B -m job_pipeline.campaign --today --dry-run
 ```

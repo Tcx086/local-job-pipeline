@@ -41,7 +41,7 @@ experience:
 class ResourceLoaderTests(unittest.TestCase):
     def test_resources_path_wins_and_legacy_fallback_works(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             resource = root / "resources" / "templates" / "answer_packs" / "common_answers.yaml"
             legacy = root / "config" / "common_answers.yaml"
             resource.parent.mkdir(parents=True)
@@ -56,18 +56,18 @@ class ResourceLoaderTests(unittest.TestCase):
 
     def test_optional_templates_missing_returns_empty_dict(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(load_cover_letter_human_templates(PathRegistry.from_project_root(Path(tmp))), {})
+            self.assertEqual(load_cover_letter_human_templates(PathRegistry.from_project_root(Path(tmp).resolve())), {})
 
     def test_missing_candidate_master_has_clear_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(FileNotFoundError, "Candidate master profile not found"):
-                load_candidate_master(PathRegistry.from_project_root(Path(tmp)))
+                load_candidate_master(PathRegistry.from_project_root(Path(tmp).resolve()))
 
 
 class WorkspaceGeneratorTests(unittest.TestCase):
     def test_generators_share_application_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             paths = PathRegistry.from_project_root(root)
             master = root / "master_resume.yaml"
             common = root / "common_answers.yaml"

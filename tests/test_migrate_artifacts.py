@@ -15,7 +15,7 @@ from job_pipeline.workspace import ApplicationWorkspace, PathRegistry
 class ArtifactMigrationTests(unittest.TestCase):
     def test_migrate_legacy_job_artifacts_to_generated_workspace(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir).resolve()
             resume = root / "data" / "resumes" / "legacy_resume.pdf"
             cover = root / "data" / "cover_letters" / "legacy_cover.md"
             answer = root / "data" / "apply_assist" / "job1" / "answer_pack.md"
@@ -74,7 +74,7 @@ class ArtifactMigrationTests(unittest.TestCase):
 
     def test_migrate_artifacts_dry_run_does_not_write_files_or_db(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir).resolve()
             resume = root / "data" / "resumes" / "legacy_resume.pdf"
             resume.parent.mkdir(parents=True, exist_ok=True)
             resume.write_text("resume", encoding="utf-8")
@@ -109,7 +109,7 @@ class ArtifactMigrationTests(unittest.TestCase):
 
     def test_cli_defaults_to_dry_run_without_writes(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir).resolve()
             resume = root / "data" / "resumes" / "legacy_resume.pdf"
             resume.parent.mkdir(parents=True, exist_ok=True)
             resume.write_text("resume", encoding="utf-8")

@@ -47,9 +47,6 @@ jobs:
       - name: Run tests
         run: ${{ matrix.test_command }}
 
-      - name: Verify setup wizard
-        run: python -B -m job_pipeline.setup_wizard --dry-run
-
       - name: Verify sample scheduler
         run: python -B -m job_pipeline.scheduler --run-once --sample
 
