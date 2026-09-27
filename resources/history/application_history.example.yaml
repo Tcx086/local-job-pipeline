@@ -1,0 +1,25 @@
+# Copy to local_resources/history/application_history.yaml.
+# This file is a sanitized example only. Never commit real application history.
+
+version: 1
+applications:
+  - company: "Example Company"
+    title: "Example Analyst"
+    location: "Toronto, ON"
+    country: "Canada"
+    status: "applied"
+    applied_at: "2026-09-01"
+    status_updated_at: "2026-09-01"
+    source: "gmail"
+    recruiter: ""
+    apply_url: ""
+    confirmation_number: ""
+    confirmation_snippet: "Application received."
+    notes: "Example only."
+    next_action: ""
+    next_action_date: ""
+    evidence:
+      - message_id: "example-message-id"
+        date: "2026-09-01"
+        subject: "We've received your application"
+        snippet: "Example sanitized evidence."

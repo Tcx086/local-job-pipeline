@@ -8,7 +8,7 @@ from job_pipeline.workspace import ApplicationWorkspace, PathRegistry
 class PathRegistryTests(unittest.TestCase):
     def test_default_paths_are_correct(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             paths = PathRegistry.from_project_root(root)
             self.assertEqual(paths.resources_dir, root / "resources")
             self.assertEqual(paths.generated_dir, root / "generated")
@@ -17,7 +17,7 @@ class PathRegistryTests(unittest.TestCase):
 
     def test_effective_db_path_falls_back_to_legacy(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             legacy = root / "data" / "job_pipeline.sqlite"
             legacy.parent.mkdir(parents=True)
             legacy.write_text("", encoding="utf-8")
@@ -26,7 +26,7 @@ class PathRegistryTests(unittest.TestCase):
 
     def test_resolve_generated_and_resource_fallbacks(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             legacy = root / "config" / "common_answers.yaml"
             legacy.parent.mkdir(parents=True)
             legacy.write_text("legacy: true", encoding="utf-8")
@@ -39,7 +39,7 @@ class PathRegistryTests(unittest.TestCase):
 class ApplicationWorkspaceTests(unittest.TestCase):
     def test_workspace_paths_follow_application_layout(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             paths = PathRegistry.from_project_root(root)
             workspace = ApplicationWorkspace.from_job(
                 {

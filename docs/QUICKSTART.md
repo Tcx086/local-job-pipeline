@@ -11,10 +11,12 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-2. Create local config files.
+2. Create local config files from the public examples (private data stays in
+git-ignored `local_resources/`; never edit the tracked examples with real facts).
 
 ```powershell
-python -m job_pipeline.setup_wizard --init
+New-Item -ItemType Directory -Force local_resources\candidate
+Copy-Item resources\candidate\master_profile.example.yaml local_resources\candidate\master_profile.yaml
 ```
 
 3. Test with sample data.

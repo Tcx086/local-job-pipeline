@@ -39,6 +39,17 @@ campaign:
       - Citi
       - HSBC
       - Standard Chartered
+      - Questrade
+      - Equitable Bank
+      - Connor Clark & Lunn
+      - CPP Investments
+      - OMERS
+      - HOOPP
+      - Ontario Teachers' Pension Plan
+      - Mackenzie Investments
+      - CI Financial
+      - goeasy
+      - Ratehub.ca
     crypto_fintech_priority:
       - OKX
       - Binance
@@ -53,6 +64,8 @@ campaign:
       - Stripe
       - Wise
       - Revolut
+      - Alpaca
+      - Mamoru
 
   max_per_company_per_day: 3
   max_same_title_per_day: 5

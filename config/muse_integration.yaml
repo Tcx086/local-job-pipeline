@@ -1,0 +1,37 @@
+muse:
+  # Queue bundles are written here. Keep generated/ ignored by Git.
+  queue_dir: "generated/muse_queue"
+
+  # Export only jobs that have already been approved in the local tracker.
+  approved_application_statuses:
+    - apply_today
+
+  # A direct application URL is required before a job can be exported.
+  require_apply_url: true
+  require_resume_pdf: true
+
+  # Private candidate facts are loaded from an ignored local file.
+  facts_path: "local_resources/muse/muse_facts.yaml"
+
+  # Muse is an execution layer, not a discovery or scoring layer.
+  allowed_actions:
+    - open_official_application_url
+    - fill_application_fields_from_manifest
+    - upload_manifest_artifacts
+    - submit_when_no_stop_condition_is_triggered
+    - write_submission_result
+
+  stop_conditions:
+    - salary_question_without_posted_range
+    - sponsorship_or_work_authorization_ambiguity
+    - legal_or_background_attestation_not_preapproved
+    - demographic_question_without_preapproved_answer
+    - new_written_response_over_300_characters
+    - missing_or_conflicting_candidate_fact
+    - unexpected_required_document
+    - payment_or_purchase_request
+    - software_install_or_unknown_code_execution_request
+    - captcha_or_identity_verification_outside_normal_ats_flow
+    - application_url_redirects_to_unverified_domain
+
+  result_filename: "result.json"

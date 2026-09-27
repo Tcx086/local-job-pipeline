@@ -13,6 +13,8 @@ resources/candidate/*.yaml
 !resources/candidate/*.example.yaml
 resources/role_profiles/*.yaml
 !resources/role_profiles/*.example.yaml
+# Real resume artifacts used only as local layout references
+layouts/**/golden/
 
 # Runtime artifacts
 data/

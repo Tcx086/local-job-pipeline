@@ -1,0 +1,74 @@
+# Role profiles — CONTENT layer (narrative guidance only).
+# Layout is frozen in layouts/canonical_finance_fintech_resume_v1/.
+# A role profile changes ONLY content: profile wording, section presence/order
+# (order only when explicitly allowed), project/experience/bullet selection and
+# wording, Core Skills selection. Never layout.
+# All evidence must come from local_resources/candidate/master_profile.yaml.
+
+trading_operations:
+  name: Trading Operations / Market Data
+  narrative: crypto trading operations + market-data infrastructure + monitoring/reconciliation/exception investigation
+  evidence_priority:
+    - Historical Live Perpetual Futures Execution
+    - Microstructure Discovery Factory
+    - API-Based Trading & Monitoring Workflows
+    - Lomidance
+    - CCC Motors
+  notes: >
+    Lead with live execution and market-data systems. Historical Live Trading is
+    the anchor; keep it own-capital/independent, never institutional.
+
+capital_markets_data:
+  name: Capital Markets Data / Data Services
+  narrative: capital-markets data + controls + exception investigation + market-data systems
+  evidence_priority:
+    - Microstructure Discovery Factory
+    - CCC Motors
+    - Lomidance
+    - Market Context Engine / Situation Monitor
+  notes: >
+    Lead with data capture/validation at scale (recruiter-readable: market-data
+    capture, sequence/duplicate/conflict controls, validation scale). CCC Motors
+    demonstrates operational/documentation controls. Market Context Engine only
+    if the JD emphasizes data pipeline / reporting / information quality.
+    Historical Live Trading appears ONLY if the JD explicitly needs
+    market/trading familiarity.
+
+data_analytics:
+  name: Data / Insights / Business Analytics
+  narrative: Python/SQL/Excel/Power BI + large datasets + business analytics + data quality
+  evidence_priority:
+    - Credit Risk Modeling
+    - Market Context Engine / Situation Monitor
+    - Lomidance
+    - CCC Motors
+  notes: >
+    Lead with analytics projects and large-dataset work. Microstructure keeps
+    only recruiter-readable scale/data-quality/monitoring content. Crypto
+    execution stays out unless the JD asks for markets exposure.
+
+risk_operations:
+  name: Risk / Treasury / Financial Operations
+  narrative: risk/data controls + reconciliation + exception investigation + analytical validation
+  evidence_priority:
+    - Credit Risk Modeling
+    - CCC Motors
+    - Microstructure Discovery Factory
+    - Quantitative Portfolio Optimization
+  notes: >
+    Lead with risk modeling and controls evidence. CCC Motors shows
+    documentation/financing workflow discipline. Quant Portfolio Optimization
+    only if the JD emphasizes risk analytics. Do not put crypto execution
+    first unless the JD explicitly requires markets exposure.
+
+technical_operations:
+  name: API / Technical Operations
+  narrative: backend/API systems + data pipelines + monitoring + operational readiness
+  evidence_priority:
+    - Lomidance
+    - Microstructure Discovery Factory
+    - API-Based Trading & Monitoring Workflows
+    - Market Context Engine / Situation Monitor
+  notes: >
+    Lead with backend/API/data-systems evidence. Operational readiness and
+    monitoring/alerting are the through-line.

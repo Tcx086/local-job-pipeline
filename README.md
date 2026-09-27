@@ -104,3 +104,34 @@ You can also use the included local launcher scripts when running on Windows:
 ## Public Version Note
 
 This public repo mirrors the private project architecture while excluding private candidate data, generated applications, databases, logs, backups, resume files, and private Git history.
+
+## Optional Muse Browser Handoff
+
+The pipeline can export explicitly approved applications to a self-contained Muse execution queue while keeping discovery, scoring, candidate facts, and application history under pipeline control.
+
+The integration does **not** add browser automation, login automation, captcha bypass, or unrestricted auto-apply behavior to this repository. It only produces a bounded manifest and artifact bundle for an external browser executor.
+
+Typical flow:
+
+```text
+collect -> normalize -> dedupe -> score -> approve
+       -> generate application workspace
+       -> export Muse manifest
+       -> external browser execution
+       -> import result.json
+```
+
+Create the private Muse facts file from the sanitized example:
+
+```powershell
+New-Item -ItemType Directory -Force local_resources\muse
+Copy-Item resources\muse\muse_facts.example.yaml local_resources\muse\muse_facts.yaml
+```
+
+Export jobs already marked `apply_today`:
+
+```powershell
+python -m job_pipeline.muse_queue export
+```
+
+See [docs/MUSE_CLOUD_INTEGRATION.md](docs/MUSE_CLOUD_INTEGRATION.md) for the cloud deployment and execution contract.
