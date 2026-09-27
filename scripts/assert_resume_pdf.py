@@ -17,7 +17,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from pypdf import PdfReader
+import fitz
 
 DEFAULT_FORBIDDEN = [
     "Targeted fit:",
@@ -37,8 +37,11 @@ DEFAULT_REQUIRED = [
 
 
 def extract_text(pdf_path: Path) -> str:
-    reader = PdfReader(str(pdf_path))
-    return "\n".join((page.extract_text() or "") for page in reader.pages)
+    doc = fitz.open(pdf_path)
+    try:
+        return "\n".join(page.get_text() for page in doc)
+    finally:
+        doc.close()
 
 
 def normalize(text: str) -> str:
