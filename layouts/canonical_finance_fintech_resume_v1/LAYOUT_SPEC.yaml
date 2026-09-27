@@ -1,0 +1,123 @@
+# canonical_finance_fintech_resume_v1 — FROZEN layout spec
+# Approved baseline: Alpaca V4.1 (2026-09-26). Do NOT change these attributes
+# when generating targeted resumes. Only content may vary per role profile.
+# Golden reference files live in golden/ with SHA256SUMS.
+
+page:
+  size: Letter  # 8.5 x 11 in
+  margins_in:
+    top: 0.45
+    bottom: 0.45
+    left: 0.6
+    right: 0.6
+
+font:
+  family: Calibri
+  body_pt: 10
+
+palette:
+  navy: "1F3864"   # name, section headings, role lines, heading rule
+  ink: "1a1a1a"    # body text, entry titles
+  muted: "404040"  # contact line 1
+  link: "0563C1"   # portfolio / github hyperlinks (underlined)
+
+header:
+  name:
+    size_pt: 17
+    bold: true
+    color: navy
+    alignment: center
+    space_after_pt: 1
+  contact_line:
+    size_pt: 9.5
+    color: muted
+    alignment: center
+    space_after_pt: 1
+  portfolio_line:
+    size_pt: 9.5
+    alignment: center
+    space_after_pt: 1
+    # format: "Portfolio: <link> | GitHub: <link>", links in `link` color, underlined
+
+section_heading:
+  size_pt: 10.5
+  bold: true
+  uppercase: true
+  color: navy
+  rule_below:
+    style: single
+    size_eighths_pt: 4
+    color: "1F3864"
+    space_pt: 1
+  space_before_pt: 6
+  space_after_pt: 2
+
+entry_title_line:
+  title_size_pt: 10
+  title_bold: true
+  title_color: ink
+  separator: " | "
+  location_size_pt: 10
+  location_color: ink
+  date_size_pt: 10
+  date_bold: true
+  date_color: ink
+  space_before_pt: 4
+  space_after_pt: 0
+
+role_line:
+  size_pt: 10
+  bold: true
+  color: navy
+  space_after_pt: 1
+
+bullets:
+  prefix: "- "
+  size_pt: 10
+  color: ink
+  left_indent_in: 0.3
+  hanging_indent_in: 0.16
+  space_before_pt: 0
+  space_after_pt: 2
+  line_spacing: 1.0
+
+skills_lines:
+  size_pt: 10
+  color: ink
+  space_after_pt: 1  # 2pt after the last line
+
+education_line:
+  size_pt: 10
+  bold: true
+  color: ink
+  space_after_pt: 2
+
+languages_line:
+  label: "LANGUAGES"
+  label_size_pt: 10
+  label_bold: true
+  label_color: navy
+  label_trailing_spaces: 2
+  text_size_pt: 10
+  text_color: ink
+  space_before_pt: 2
+  space_after_pt: 2
+
+paragraph_defaults:
+  line_spacing: 1.0
+  space_after_pt: 2
+
+# Content that MAY vary per role profile (everything else is frozen):
+# - Professional Profile wording (max 2 bullets)
+# - which sections appear (from the fixed set below)
+# - section order (only when the role profile explicitly allows)
+# - project selection / experience selection / bullet selection / bullet wording
+# - Core Skills selection (max 3 compact lines)
+fixed_section_set:
+  - Header
+  - PROFESSIONAL PROFILE
+  - RELEVANT MARKET EXPERIENCE
+  - PROFESSIONAL EXPERIENCE
+  - CORE SKILLS
+  - EDUCATION
+  - LANGUAGES
